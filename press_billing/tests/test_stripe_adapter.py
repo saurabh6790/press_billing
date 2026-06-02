@@ -103,4 +103,5 @@ class TestStripeAdapter(GatewayAdapterContract, IntegrationTestCase):
 			"type": "payment_intent.succeeded",
 			"data": {"object": {"id": "pi_charged"}},
 		}
-		return payload, "evt_123", "payment_intent.succeeded"
+		# Stripe carries the event id in the body, so headers are irrelevant.
+		return payload, {}, "evt_123", "payment_intent.succeeded"

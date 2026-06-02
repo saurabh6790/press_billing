@@ -15,6 +15,7 @@ from press_billing.gateways.base import (
 	NormalisedEvent,
 	PaymentResult,
 	RefundResult,
+	header_value,
 )
 
 
@@ -85,15 +86,15 @@ class StripeAdapter(GatewayAdapter):
 	def verify_webhook_signature(self, payload: bytes, headers: dict) -> bool:
 		"""HMAC-verify the raw webhook body. No DB writes; first security gate."""
 		secret = self.gateway.get_password("webhook_secret")
-		signature = headers.get("Stripe-Signature")
+		signature = header_value(headers, "Stripe-Signature")
 		try:
 			stripe.Webhook.construct_event(payload, signature, secret)
 			return True
 		except (ValueError, stripe.error.SignatureVerificationError):
 			return False
 
-	def parse_webhook_event(self, payload: dict) -> NormalisedEvent:
-		"""Normalise an already-verified Stripe event dict."""
+	def parse_webhook_event(self, payload: dict, headers: dict | None = None) -> NormalisedEvent:
+		"""Normalise an already-verified Stripe event dict (id is in the body)."""
 		return NormalisedEvent(
 			gateway_event_id=payload.get("id"),
 			event_type=payload.get("type"),

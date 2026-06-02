@@ -52,7 +52,7 @@ class GatewayAdapterContract:
 		raise NotImplementedError
 
 	def parse_event_inputs(self):
-		"""Return (payload_dict, expected_event_id, expected_event_type)."""
+		"""Return (payload_dict, headers, expected_event_id, expected_event_type)."""
 		raise NotImplementedError
 
 	# --- contract -----------------------------------------------------------
@@ -97,8 +97,8 @@ class GatewayAdapterContract:
 
 	def test_parse_webhook_event_normalises_id_and_type(self):
 		adapter = self.make_adapter()
-		payload, expected_id, expected_type = self.parse_event_inputs()
-		event = adapter.parse_webhook_event(payload)
+		payload, headers, expected_id, expected_type = self.parse_event_inputs()
+		event = adapter.parse_webhook_event(payload, headers)
 		self.assertEqual(event.gateway_event_id, expected_id)
 		self.assertEqual(event.event_type, expected_type)
 

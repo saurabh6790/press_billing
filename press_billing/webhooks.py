@@ -21,6 +21,15 @@ def stripe():
 	)
 
 
+@frappe.whitelist(allow_guest=True)
+def razorpay():
+	return process_webhook(
+		"razorpay",
+		frappe.request.get_data(),
+		dict(frappe.request.headers),
+	)
+
+
 def process_webhook(adapter_key: str, payload: bytes, headers: dict) -> dict:
 	gateway = _resolve_gateway(adapter_key)
 	adapter = gateway.get_adapter()
@@ -31,7 +40,7 @@ def process_webhook(adapter_key: str, payload: bytes, headers: dict) -> dict:
 		return {"ok": False}
 
 	body = payload.decode() if isinstance(payload, bytes) else payload
-	event = adapter.parse_webhook_event(frappe.parse_json(body))
+	event = adapter.parse_webhook_event(frappe.parse_json(body), headers)
 	_store_and_enqueue(gateway, event, payload)
 	frappe.local.response.http_status_code = 200
 	return {"ok": True, "event": event.gateway_event_id}

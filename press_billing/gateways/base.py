@@ -10,6 +10,17 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 
+def header_value(headers: dict, name: str):
+	"""Case-insensitive header lookup (werkzeug preserves sent casing)."""
+	if not headers:
+		return None
+	target = name.lower()
+	for key, value in headers.items():
+		if key.lower() == target:
+			return value
+	return None
+
+
 @dataclass
 class PaymentResult:
 	success: bool
@@ -59,7 +70,7 @@ class GatewayAdapter(ABC):
 	def verify_webhook_signature(self, payload: bytes, headers: dict) -> bool: ...
 
 	@abstractmethod
-	def parse_webhook_event(self, payload: dict) -> NormalisedEvent: ...
+	def parse_webhook_event(self, payload: dict, headers: dict | None = None) -> NormalisedEvent: ...
 
 	@abstractmethod
 	def get_transaction_status(self, gateway_txn_id: str) -> str: ...
