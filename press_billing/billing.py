@@ -118,6 +118,7 @@ def generate_draft_invoice(subscription: str, period_start, period_end):
 		return existing
 
 	from press_billing.metering import metered_line_items
+	from press_billing.trials import invoice_type_for
 
 	lines = compute_line_items(sub.team, sub.cluster, period_start, period_end)
 	lines += metered_line_items(sub.team, sub.cluster, period_start, period_end)
@@ -128,12 +129,14 @@ def generate_draft_invoice(subscription: str, period_start, period_end):
 	currency = frappe.db.get_value(
 		"Price Lock", {"team": sub.team, "cluster": sub.cluster}, "currency"
 	)
+	# The single branch point: an entry-tier (free/trial) team's invoice is a
+	# cost_report — computed identically, but a true cost rather than a bill.
 	invoice = frappe.get_doc(
 		{
 			"doctype": "Invoice",
 			"team": sub.team,
 			"subscription": subscription,
-			"invoice_type": "billable",
+			"invoice_type": invoice_type_for(sub.team),
 			"status": "Draft",
 			"period_start": period_start,
 			"period_end": period_end,
@@ -194,6 +197,15 @@ def open_and_collect(invoice: str, collect: bool = True) -> dict:
 		return {"invoice": invoice, "claimed": False}
 
 	doc = frappe.get_doc("Invoice", invoice)
+
+	# Free/trial: a cost_report is computed, never collected — no credits, no
+	# charge. It is opened as a record of the subsidy cost.
+	if doc.invoice_type == "cost_report":
+		doc.credit_applied = 0
+		doc.expected_collection = 0
+		doc.status = "Open"
+		doc.save(ignore_permissions=True)
+		return {"invoice": invoice, "claimed": True, "cost_report": True, "expected_collection": 0}
 
 	# Leg 1 — credits first.
 	applied = 0
