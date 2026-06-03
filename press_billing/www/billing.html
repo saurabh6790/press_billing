@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cloud Billing</title>
+    <link rel="stylesheet" href="/assets/press_billing/dashboard/assets/index.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      window.csrf_token = "{{ frappe.session.csrf_token if frappe.session else '' }}";
+    </script>
+    <script type="module" src="/assets/press_billing/dashboard/assets/index.js"></script>
+  </body>
+</html>

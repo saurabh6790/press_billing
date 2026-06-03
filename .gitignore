@@ -1,55 +1,55 @@
+
+# Aider AI Chat
 # Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
+# Dependency directories
+# Distribution / packaging
+# Environments
+# Helix Editor
+# IDEs and editors
 *$py.class
+*.DS_Store
+*.comp.js
+*.egg
+*.egg-info/
+*.kdev4
+*.py[cod]
 *.pyc
 *.py~
-
-# Distribution / packaging
+*.swp
+*debug.log
 .Python
+.aider*
+.eggs/
+.env
+.helix/
+.idea/
+.installed.cfg
+.kdev4/
+.venv
+.vs/
+.vscode/
+.wnf-lang-status
+ENV/
+MANIFEST
+__pycache__/
+dashboard/.vite/
+dashboard/node_modules/
 develop-eggs/
 dist/
 downloads/
 eggs/
-.eggs/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-tags
-MANIFEST
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
 env.bak/
-venv.bak/
-
-# Dependency directories
-node_modules/
+env/
 jspm_packages/
-
-# IDEs and editors
-.vscode/
-.vs/
-.idea/
-.kdev4/
-*.kdev4
-*.DS_Store
-*.swp
-*.comp.js
-.wnf-lang-status
-*debug.log
-
-# Helix Editor
-.helix/
-
-# Aider AI Chat
-.aider*
+lib64/
+node_modules/
+parts/
+press_billing/public/dashboard/
+sdist/
+tags
+var/
+venv.bak/
+venv/
+wheels/
+dashboard/auto-imports.d.ts
+dashboard/components.d.ts

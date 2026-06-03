@@ -56,6 +56,12 @@ app_license = "mit"
 # Home Pages
 # ----------
 
+# The billing SPA (#26): deep links under /billing/* are served by the same
+# www/billing.html shell so the client-side router can take over.
+website_route_rules = [
+	{"from_route": "/billing/<path:app_path>", "to_route": "billing"},
+]
+
 # application home page (will override Website Settings)
 # home_page = "login"
 
