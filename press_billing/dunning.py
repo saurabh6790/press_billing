@@ -38,14 +38,18 @@ def _has_card(sub) -> bool:
 
 def retry_payment(invoice_name: str) -> dict:
 	"""One dunning retry: a fresh Payment Attempt, notified with the reason."""
+	from press_billing import notifications
+
 	result = charges.pay_invoice(invoice_name)
 	if result.get("attempt"):
 		attempt = frappe.get_doc("Payment Attempt", result["attempt"])
 		if attempt.status == "failed":
 			n = frappe.db.count("Payment Attempt", {"invoice": invoice_name})
-			_notify(
-				frappe.get_doc("Invoice", invoice_name),
-				f"Payment retry {n} failed: {attempt.failure_reason or attempt.failure_code or 'declined'}",
+			reason = attempt.failure_reason or attempt.failure_code or "declined"
+			notifications.notify(
+				attempt.team, "payment_retry",
+				message=f"Payment retry {n} for invoice {invoice_name} failed: {reason}",
+				reference_doctype="Invoice", reference_name=invoice_name,
 			)
 	return result
 
@@ -110,6 +114,12 @@ def process_invoice_dunning(invoice_name: str, now=None) -> dict:
 		if inv.status == "Open":
 			inv.db_set("status", "Overdue")
 			actions.append("overdue")
+			from press_billing import notifications
+
+			notifications.notify(
+				inv.team, "invoice_overdue", context={"invoice": invoice_name},
+				reference_doctype="Invoice", reference_name=invoice_name,
+			)
 		if sub:
 			standing = _advance_standing(inv.subscription, "past_due")
 

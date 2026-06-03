@@ -155,12 +155,14 @@ def expire_payment_methods(now=None) -> dict:
 	A card is valid through the end of its printed expiry month; the day after,
 	it is no longer chargeable.
 	"""
+	from press_billing import notifications
+
 	today = frappe.utils.getdate(now or frappe.utils.now_datetime())
 	expired = []
 	for m in frappe.get_all(
 		"Payment Method",
 		filters={"method_type": CARD_METHOD, "status": "active"},
-		fields=["name", "expiry_month", "expiry_year"],
+		fields=["name", "team", "display_label", "expiry_month", "expiry_year"],
 	):
 		if not m.expiry_year or not m.expiry_month:
 			continue
@@ -168,4 +170,8 @@ def expire_payment_methods(now=None) -> dict:
 		if frappe.utils.get_last_day(month_start) < today:
 			frappe.db.set_value("Payment Method", m.name, "status", "expired")
 			expired.append(m.name)
+			notifications.notify(
+				m.team, "card_expiry", context={"label": m.display_label or "card"},
+				reference_doctype="Payment Method", reference_name=m.name,
+			)
 	return {"expired": expired}

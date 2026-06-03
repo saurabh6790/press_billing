@@ -140,6 +140,13 @@ def apply_webhook(event_name: str) -> dict:
 			attempt.status = "failed"
 			attempt.completed_at = frappe.utils.now_datetime()
 			attempt.save(ignore_permissions=True)
+			from press_billing import notifications
+
+			notifications.notify(
+				attempt.team, "payment_failure",
+				context={"invoice": attempt.invoice, "reason": attempt.failure_reason or "declined"},
+				reference_doctype="Invoice", reference_name=attempt.invoice,
+			)
 		_mark_event(event, "processed")
 		return {"handled": True, "result": "failed", "attempt": attempt_name}
 
@@ -160,7 +167,14 @@ def _settle_invoice(attempt) -> bool:
 	inv.amount_paid = frappe.utils.flt(attempt.amount)
 	inv.status = "Paid"
 	inv.save(ignore_permissions=True)
-	_notify(inv, f"Invoice {inv.name} paid ({inv.amount_paid} {inv.currency or ''}).")
+
+	from press_billing import notifications
+
+	notifications.notify(
+		inv.team, "payment_success",
+		message=f"Invoice {inv.name} paid ({inv.amount_paid} {inv.currency or ''}).",
+		reference_doctype="Invoice", reference_name=inv.name,
+	)
 
 	# Async, one-way, non-blocking push to the statutory SOR (#17).
 	from press_billing.erpnext_sync import enqueue_invoice_sync

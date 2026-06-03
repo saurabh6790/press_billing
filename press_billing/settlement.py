@@ -102,7 +102,10 @@ def credit_forecast(team: str, projected_spend, notify: bool = True) -> dict:
 
 
 def _notify_top_up(team: str, balance, projected, utilisation):
-	"""Emit a top-up prompt (placeholder for the #20 notification suite)."""
+	"""Emit the credit-low top-up prompt through the notification suite (#20)."""
+	from press_billing import notifications
+
+	notifications.notify(team, "credit_low", context={"utilisation": f"{utilisation:.0%}"})
 	frappe.publish_realtime(
 		"billing_top_up_prompt",
 		{"team": team, "balance": balance, "projected_spend": projected, "utilisation": utilisation},

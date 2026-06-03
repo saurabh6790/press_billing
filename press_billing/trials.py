@@ -86,8 +86,10 @@ def expire_trial(team: str, cluster_slices: dict | None = None) -> dict:
 	staged enforcement (#14). Running resources are not touched here — the
 	directive carries the intent.
 	"""
+	from press_billing import notifications
 	from press_billing.entitlements import issue_token
 
+	notifications.notify(team, "trial_expiring", context={})
 	return issue_token(team, cluster_slices or {}, suspend=True)
 
 
