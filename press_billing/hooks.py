@@ -94,8 +94,11 @@ website_route_rules = [
 # before_install = "press_billing.install.before_install"
 # after_install = "press_billing.install.after_install"
 
-# Ensure the Billing Admin / Billing User roles exist (#22).
-after_migrate = "press_billing.security.ensure_billing_roles"
+# Ensure billing roles (#22) + the User->team link field exist after migrate.
+after_migrate = [
+	"press_billing.security.ensure_billing_roles",
+	"press_billing.dashboard.ensure_billing_team_field",
+]
 
 # Uninstallation
 # ------------

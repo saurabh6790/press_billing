@@ -109,12 +109,13 @@ class TestConversion(TrialTestBase):
 
 class TestSubsidyAndExpiry(TrialTestBase):
 	def test_subsidy_total_sums_cost_report_invoices(self):
-		provision("srv-a", rate=1000)
-		provision("srv-b", rate=2000)
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		# A far-future period isolates this global aggregate from seeded demo data.
+		provision("srv-a", rate=1000, start="2099-01-01 00:00:00")
+		provision("srv-b", rate=2000, start="2099-01-01 00:00:00")
+		name = billing.generate_draft_invoice(self.sub, "2099-01-01", "2099-01-31")
 		self.assertEqual(frappe.db.get_value("Invoice", name, "invoice_type"), "cost_report")
 
-		subsidy = trials.subsidy_total("2026-06-01", "2026-06-30")
+		subsidy = trials.subsidy_total("2099-01-01", "2099-01-31")
 		self.assertEqual(subsidy, 3000.0)  # 1000 + 2000, full month
 
 	def test_expired_trial_emits_suspend_directive(self):

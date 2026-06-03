@@ -24,9 +24,15 @@ PAYPAL_GW = "GW-Demo-PayPal"
 
 
 def seed_all() -> dict:
+	from press_billing.dashboard import ensure_billing_team_field
+
 	demo.seed()  # happy-path `demo` team + catalog + gateways + tier levels + workspace
 	_extra_gateways()
 	_ensure_signing_key()
+	ensure_billing_team_field()
+	_profile("demo", gstin="27AAPFU0939F1ZV")
+	# So an admin browsing the portal lands on the `demo` team by default.
+	frappe.db.set_value("User", "Administrator", "billing_team", "demo")
 
 	results = {"demo": "happy path (Paid May + Open June, wallet, card)"}
 	results["demo-overdue"] = scenario_overdue()
@@ -215,6 +221,18 @@ def _base(team, tier, gst):
 		"max_spend": 50000 if tier == "t1" else 10000, "manual_override": 1})
 	if gst:
 		demo._replace("Tax Profile", team, {"output_tax_type": "GST", "output_tax_rate": 18})
+	_profile(team)
+
+
+def _profile(team, gstin="27AAPFU0939F1ZV"):
+	if frappe.db.exists("Billing Profile", team):
+		frappe.delete_doc("Billing Profile", team, force=True)
+	frappe.get_doc({
+		"doctype": "Billing Profile", "team": team, "legal_name": f"{team.title()} Pvt Ltd",
+		"email": f"billing@{team}.example", "gstin": gstin, "address_line1": "1 Demo Street",
+		"city": "Mumbai", "state": "Maharashtra", "country": "India", "pincode": "400001",
+		"billing_mode": "postpaid",
+	}).insert(ignore_permissions=True)
 
 
 def _subscription(team, default_pm=None, gateway=None):
@@ -280,6 +298,6 @@ def _wipe_team(team):
 			   "Usage Rollup", "Credit Ledger Entry", "Subscription", "Notification Log",
 			   "Entitlement Token"):
 		frappe.db.delete(dt, {"team": team})
-	for dt in ("Credit Wallet", "Trust Tier", "Tax Profile"):
+	for dt in ("Credit Wallet", "Trust Tier", "Tax Profile", "Billing Profile"):
 		if frappe.db.exists(dt, team):
 			frappe.delete_doc(dt, team, force=True)

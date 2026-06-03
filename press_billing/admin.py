@@ -194,3 +194,67 @@ def update_plan_rate(plan: str, currency: str, rate, cluster: str = "") -> dict:
 		doc.append("rates", {"currency": currency, "cluster": cluster or None, "rate": rate})
 	doc.save(ignore_permissions=True)
 	return {"plan": plan, "currency": currency, "cluster": cluster or "global", "rate": frappe.utils.flt(rate)}
+
+
+_STANDING_RANK = {"current": 0, "past_due": 1, "suspended": 2}
+
+
+def _plan_monthly_inr(plan: str, cluster: str | None) -> float:
+	from press_billing.pricing import resolve_rate
+
+	if not plan or not frappe.db.exists("Plan", plan):
+		return 0.0
+	doc = frappe.get_doc("Plan", plan)
+	return frappe.utils.flt(resolve_rate(doc.rates, "INR", cluster))
+
+
+@frappe.whitelist()
+def get_metrics() -> dict:
+	"""Headline reports: team counts, on-time vs delinquent, failures, MRR."""
+	require_billing_admin()
+	subs = frappe.get_all(
+		"Subscription", fields=["team", "plan", "cluster", "account_standing", "billing_cycle"]
+	)
+	teams, mrr = {}, 0.0
+	for s in subs:
+		rate = _plan_monthly_inr(s.plan, s.cluster)
+		mrr += rate / 12 if s.billing_cycle == "annual" else rate
+		cur = teams.get(s.team, "current")
+		teams[s.team] = s.account_standing if _STANDING_RANK.get(s.account_standing, 0) > _STANDING_RANK.get(cur, 0) else cur
+
+	on_time = sum(1 for st in teams.values() if st == "current")
+	team_count = len(teams)
+	return {
+		"team_count": team_count,
+		"paying_on_time": on_time,
+		"delinquent": team_count - on_time,            # past_due or suspended
+		"suspended": sum(1 for st in teams.values() if st == "suspended"),
+		"payment_failures": frappe.db.count("Payment Attempt", {"status": "failed"}),
+		"mrr": frappe.utils.flt(mrr, 2),
+		"active_subscriptions": len(subs),
+	}
+
+
+@frappe.whitelist()
+def list_teams() -> list[dict]:
+	"""Per-team rollup for the admin teams report."""
+	require_billing_admin()
+	from press_billing import credits
+
+	teams = {}
+	for s in frappe.get_all(
+		"Subscription", fields=["team", "plan", "cluster", "account_standing", "billing_cycle"]
+	):
+		t = teams.setdefault(s.team, {"team": s.team, "standing": "current", "mrr": 0.0, "subscriptions": 0})
+		rate = _plan_monthly_inr(s.plan, s.cluster)
+		t["mrr"] += rate / 12 if s.billing_cycle == "annual" else rate
+		t["subscriptions"] += 1
+		if _STANDING_RANK.get(s.account_standing, 0) > _STANDING_RANK.get(t["standing"], 0):
+			t["standing"] = s.account_standing
+	rows = []
+	for t in teams.values():
+		t["mrr"] = frappe.utils.flt(t["mrr"], 2)
+		t["open_invoices"] = frappe.db.count("Invoice", {"team": t["team"], "status": ["in", ["Open", "Overdue"]]})
+		t["credit_balance"] = frappe.utils.flt(credits.get_balance(t["team"])["balance"])
+		rows.append(t)
+	return sorted(rows, key=lambda r: r["mrr"], reverse=True)

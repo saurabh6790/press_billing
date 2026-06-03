@@ -125,3 +125,26 @@ class TestPriceManagement(AdminTestBase):
 		# ...but the existing lock is unchanged.
 		self.assertEqual(frappe.db.get_value("Price Lock", {"source_event_id": "evt-lock-x"}, "locked_rate"), 3200)
 		frappe.db.delete("Price Lock", {"team": TEAM_A})
+
+
+class TestMetricsReports(AdminTestBase):
+	def test_metrics_counts_and_mrr(self):
+		from press_billing import subscriptions
+
+		subscriptions.create_subscription(team=TEAM_A, cluster="ap-south-1", plan=PLAN, billing_cycle="monthly")
+		sub_b = subscriptions.create_subscription(team=TEAM_B, cluster="ap-south-1", plan=PLAN, billing_cycle="monthly")
+		subscriptions.set_standing(sub_b.name, "past_due")
+
+		m = admin.get_metrics()
+		self.assertGreaterEqual(m["team_count"], 2)
+		self.assertGreaterEqual(m["delinquent"], 1)
+		self.assertGreater(m["mrr"], 0)
+		self.assertIn("payment_failures", m)
+
+		teams = {t["team"]: t for t in admin.list_teams()}
+		self.assertEqual(teams[TEAM_B]["standing"], "past_due")
+		self.assertGreater(teams[TEAM_A]["mrr"], 0)
+		for team in (TEAM_A, TEAM_B):
+			for sub in frappe.get_all("Subscription", {"team": team}, pluck="name"):
+				frappe.db.delete("Subscription Change", {"subscription": sub})
+			frappe.db.delete("Subscription", {"team": team})

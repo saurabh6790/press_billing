@@ -132,3 +132,48 @@ class TestTeamScoping(CustomerDataBase):
 					dashboard.list_invoices("some-other-team")  # rejected, not widened
 		finally:
 			frappe.set_user("Administrator")
+
+
+class TestCustomerActions(CustomerDataBase):
+	def tearDown(self):
+		if frappe.db.exists("Billing Profile", TEAM):
+			frappe.db.delete("Billing Profile", {"team": TEAM})
+		super().tearDown()
+
+	def test_gstin_validation(self):
+		dashboard.save_billing_profile(TEAM, legal_name="Acme Pvt Ltd", gstin="27AAPFU0939F1ZV")
+		self.assertEqual(frappe.db.get_value("Billing Profile", TEAM, "gstin"), "27AAPFU0939F1ZV")
+		with self.assertRaises(frappe.ValidationError):
+			dashboard.save_billing_profile(TEAM, legal_name="Acme", gstin="NOT-A-GSTIN")
+
+	def test_subscribe_requires_billing_profile(self):
+		with self.assertRaises(frappe.ValidationError):
+			dashboard.create_subscription(team=TEAM, plan=PLAN, cluster=CLUSTER)
+		dashboard.save_billing_profile(TEAM, legal_name="Acme")
+		out = dashboard.create_subscription(team=TEAM, plan=PLAN, cluster=CLUSTER)
+		self.assertTrue(out["subscription"])
+		self.assertEqual(out["account_standing"], "current")
+
+	def test_purchase_credits(self):
+		out = dashboard.purchase_credits(team=TEAM, amount=1500)
+		self.assertEqual(out["new_balance"], 1500)
+		self.assertEqual(dashboard.get_credit_balance(TEAM)["balance"], 1500)
+		with self.assertRaises(frappe.ValidationError):
+			dashboard.purchase_credits(team=TEAM, amount=0)
+
+	def test_list_plans_has_rate(self):
+		plans = {p["name"]: p for p in dashboard.list_plans("INR")}
+		self.assertIn(PLAN, plans)
+		self.assertGreater(plans[PLAN]["rate"], 0)
+
+	def test_billing_settings_roundtrip(self):
+		dashboard.save_billing_settings(team=TEAM, billing_mode="prepaid", min_balance=5000)
+		s = dashboard.get_billing_settings(TEAM)
+		self.assertEqual(s["billing_mode"], "prepaid")
+		self.assertEqual(s["min_balance"], 5000)
+
+	def test_admin_without_team_falls_back(self):
+		dashboard.save_billing_profile(TEAM, legal_name="Acme")
+		dashboard.create_subscription(team=TEAM, plan=PLAN, cluster=CLUSTER)
+		invoices = dashboard.list_invoices()  # no team arg, as admin
+		self.assertIsInstance(invoices, list)
