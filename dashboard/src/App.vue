@@ -33,5 +33,6 @@ const tabs = [
   { label: 'Invoices', to: '/billing/invoices' },
   { label: 'Payment Methods', to: '/billing/methods' },
   { label: 'Credits', to: '/billing/credits' },
+  { label: 'Admin', to: '/billing/admin' },
 ];
 </script>

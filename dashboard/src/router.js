@@ -6,6 +6,7 @@ const routes = [
   { path: '/billing/invoices', name: 'Invoices', component: () => import('@/pages/Invoices.vue') },
   { path: '/billing/methods', name: 'PaymentMethods', component: () => import('@/pages/PaymentMethods.vue') },
   { path: '/billing/credits', name: 'Credits', component: () => import('@/pages/Credits.vue') },
+  { path: '/billing/admin', name: 'Admin', component: () => import('@/pages/Admin.vue') },
 ];
 
 export default createRouter({
