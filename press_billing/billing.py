@@ -169,9 +169,16 @@ def generate_draft_invoices(period_start, period_end, enqueue: bool = False) -> 
 # --- phase 2: open & collect (1st) ------------------------------------------
 
 
-def open_and_collect(invoice: str) -> dict:
-	"""Apply credits and claim Draft -> Open atomically, then leave collection to
-	the charge step (#10).
+def open_and_collect(invoice: str, collect: bool = True) -> dict:
+	"""Run the credits-then-card waterfall and claim Draft -> Open atomically.
+
+	1. Apply wallet credits first (under the wallet `FOR UPDATE`), reducing the
+	   amount due — `credit_applied` recorded on the invoice.
+	2. If credits cover the bill in full, the invoice is settled (`Paid`) with no
+	   gateway round-trip.
+	3. Otherwise open it and charge the **remainder** to the card (#10). A
+	   credits-only team with a shortfall is left `Open` for dunning (#14) —
+	   never stopped here.
 
 	Concurrency: the invoice row is locked FOR UPDATE and the transition only
 	fires from `Draft`, so parallel workers never process the same invoice
@@ -185,7 +192,7 @@ def open_and_collect(invoice: str) -> dict:
 
 	doc = frappe.get_doc("Invoice", invoice)
 
-	# Credits first (credits-then-card waterfall, #11 builds the card side).
+	# Leg 1 — credits first.
 	applied = 0
 	if frappe.utils.flt(doc.total) > 0:
 		balance = credits.get_balance(doc.team)["balance"]
@@ -199,10 +206,28 @@ def open_and_collect(invoice: str) -> dict:
 	doc.credit_applied = applied
 	doc.expected_collection = frappe.utils.flt(doc.total) - applied
 	doc.due_date = frappe.utils.add_days(frappe.utils.nowdate(), DEFAULT_DUE_DAYS)
+
+	# Credits cover it in full — settled, no card charge needed.
+	if doc.expected_collection <= 0:
+		doc.status = "Paid"
+		doc.save(ignore_permissions=True)
+		return {"invoice": invoice, "claimed": True, "credit_applied": applied,
+				"expected_collection": 0, "status": "Paid"}
+
 	doc.status = "Open"
 	doc.save(ignore_permissions=True)
+
+	# Leg 2 — charge the remainder to the card, when the team has one wired.
+	charge = None
+	if collect and doc.subscription:
+		sub = frappe.get_doc("Subscription", doc.subscription)
+		if sub.default_payment_method and sub.gateway:
+			from press_billing import charges
+
+			charge = charges.pay_invoice(invoice)
+
 	return {"invoice": invoice, "claimed": True, "credit_applied": applied,
-			"expected_collection": doc.expected_collection}
+			"expected_collection": doc.expected_collection, "status": "Open", "charge": charge}
 
 
 def open_drafts(period_end, enqueue: bool = False) -> list[str]:
