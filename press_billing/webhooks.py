@@ -79,5 +79,11 @@ def _store_and_enqueue(gateway, event, payload: bytes):
 
 
 def handle_webhook_event(event_name: str):
-	"""Background state transition for a stored Webhook Event (filled in later issues)."""
-	frappe.db.set_value("Webhook Event", event_name, "status", "processed")
+	"""Background state transition for a stored Webhook Event.
+
+	Charge settlement (Open -> Paid) lives in charges.apply_webhook; this is the
+	dispatch point. Other event families are added as their issues land.
+	"""
+	from press_billing import charges
+
+	return charges.apply_webhook(event_name)
