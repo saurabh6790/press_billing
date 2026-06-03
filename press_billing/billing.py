@@ -125,10 +125,17 @@ def generate_draft_invoice(subscription: str, period_start, period_end):
 	if not lines:
 		return None
 
+	from press_billing.tax import resolve_tax
+
 	subtotal = frappe.utils.flt(sum(line["amount"] for line in lines), 2)
 	currency = frappe.db.get_value(
 		"Price Lock", {"team": sub.team, "cluster": sub.cluster}, "currency"
 	)
+	tax = resolve_tax(sub.team, subtotal)
+	total = frappe.utils.flt(subtotal + tax["output_tax_amount"], 2)
+	# expected_collection = total - tds (credits reduce it further at open).
+	expected = frappe.utils.flt(total - tax["tds_amount"], 2)
+
 	# The single branch point: an entry-tier (free/trial) team's invoice is a
 	# cost_report — computed identically, but a true cost rather than a bill.
 	invoice = frappe.get_doc(
@@ -143,10 +150,16 @@ def generate_draft_invoice(subscription: str, period_start, period_end):
 			"currency": currency,
 			"items": lines,
 			"subtotal": subtotal,
-			"output_tax": 0,
-			"total": subtotal,
+			"output_tax_type": tax["output_tax_type"],
+			"output_tax_rate": tax["output_tax_rate"],
+			"output_tax_amount": tax["output_tax_amount"],
+			"zero_rating_reason": tax["zero_rating_reason"],
+			"tds_applicable": tax["tds_applicable"],
+			"tds_rate": tax["tds_rate"],
+			"tds_amount": tax["tds_amount"],
+			"total": total,
 			"credit_applied": 0,
-			"expected_collection": subtotal,
+			"expected_collection": expected,
 			"amount_paid": 0,
 		}
 	).insert(ignore_permissions=True)
@@ -207,11 +220,12 @@ def open_and_collect(invoice: str, collect: bool = True) -> dict:
 		doc.save(ignore_permissions=True)
 		return {"invoice": invoice, "claimed": True, "cost_report": True, "expected_collection": 0}
 
-	# Leg 1 — credits first.
+	# Leg 1 — credits first (only against the collectable amount, gross less TDS).
 	applied = 0
-	if frappe.utils.flt(doc.total) > 0:
+	collectable = frappe.utils.flt(doc.total) - frappe.utils.flt(doc.tds_amount)
+	if collectable > 0:
 		balance = credits.get_balance(doc.team)["balance"]
-		applied = min(frappe.utils.flt(balance), frappe.utils.flt(doc.total))
+		applied = min(frappe.utils.flt(balance), collectable)
 		if applied > 0:
 			credits.apply_credit(
 				doc.team, applied, reference_type="Invoice", reference_name=invoice,
@@ -219,7 +233,10 @@ def open_and_collect(invoice: str, collect: bool = True) -> dict:
 			)
 
 	doc.credit_applied = applied
-	doc.expected_collection = frappe.utils.flt(doc.total) - applied
+	# Auto-charge target = gross total, less withheld TDS, less credits applied.
+	doc.expected_collection = frappe.utils.flt(
+		frappe.utils.flt(doc.total) - frappe.utils.flt(doc.tds_amount) - applied, 2
+	)
 	doc.due_date = frappe.utils.add_days(frappe.utils.nowdate(), DEFAULT_DUE_DAYS)
 
 	# Credits cover it in full — settled, no card charge needed.

@@ -21,9 +21,16 @@
   "section_break_totals",
   "currency",
   "subtotal",
-  "output_tax",
+  "output_tax_type",
+  "output_tax_rate",
+  "output_tax_amount",
+  "zero_rating_reason",
   "total",
   "column_break_totals",
+  "tds_applicable",
+  "tds_rate",
+  "tds_amount",
+  "tds_certificate_received",
   "credit_applied",
   "expected_collection",
   "amount_paid",
@@ -108,21 +115,70 @@
    "label": "Subtotal"
   },
   {
+   "default": "none",
+   "fieldname": "output_tax_type",
+   "fieldtype": "Select",
+   "label": "Output Tax Type",
+   "options": "none\nGST\nVAT",
+   "description": "Additive output tax (added to total)"
+  },
+  {
    "default": "0",
-   "fieldname": "output_tax",
+   "fieldname": "output_tax_rate",
+   "fieldtype": "Float",
+   "label": "Output Tax Rate %"
+  },
+  {
+   "default": "0",
+   "fieldname": "output_tax_amount",
    "fieldtype": "Currency",
-   "label": "Output Tax"
+   "label": "Output Tax Amount",
+   "description": "Added to total"
+  },
+  {
+   "fieldname": "zero_rating_reason",
+   "fieldtype": "Select",
+   "label": "Zero-Rating Reason",
+   "options": "\nsez_lut\nexport",
+   "description": "Why output tax is 0 (compliance reason — never blank when zero-rated)"
   },
   {
    "fieldname": "total",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Total",
-   "description": "subtotal + output_tax"
+   "description": "subtotal + output_tax_amount (the gross; mandate ceiling uses this)"
   },
   {
    "fieldname": "column_break_totals",
    "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "tds_applicable",
+   "fieldtype": "Check",
+   "label": "TDS Applicable",
+   "description": "Customer self-declares (has TAN)"
+  },
+  {
+   "default": "0",
+   "fieldname": "tds_rate",
+   "fieldtype": "Float",
+   "label": "TDS Rate %"
+  },
+  {
+   "default": "0",
+   "fieldname": "tds_amount",
+   "fieldtype": "Currency",
+   "label": "TDS Amount",
+   "description": "Withheld — reduces collected, NOT total. 0 at launch"
+  },
+  {
+   "default": "0",
+   "fieldname": "tds_certificate_received",
+   "fieldtype": "Check",
+   "label": "TDS Certificate Received",
+   "description": "Gate for closing a withheld invoice"
   },
   {
    "default": "0",
