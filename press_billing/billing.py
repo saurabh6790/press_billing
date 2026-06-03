@@ -117,7 +117,10 @@ def generate_draft_invoice(subscription: str, period_start, period_end):
 	if existing:
 		return existing
 
+	from press_billing.metering import metered_line_items
+
 	lines = compute_line_items(sub.team, sub.cluster, period_start, period_end)
+	lines += metered_line_items(sub.team, sub.cluster, period_start, period_end)
 	if not lines:
 		return None
 

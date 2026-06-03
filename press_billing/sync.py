@@ -70,3 +70,25 @@ def receive_usage_events(events) -> dict:
 			acknowledged.append(event_id)
 
 	return {"acknowledged": acknowledged}
+
+
+@frappe.whitelist()
+def receive_meter_rollups(meters) -> dict:
+	"""Agent -> Central: ingest metered rollups into the bounded rollup store.
+
+	Idempotent on each rollup's idempotency_key; a re-push replaces the period
+	figure rather than adding. Returns the acknowledged keys so the Agent marks
+	exactly those synced.
+	"""
+	from press_billing.metering import ingest_rollup
+
+	if isinstance(meters, str):
+		meters = frappe.parse_json(meters)
+
+	acknowledged = []
+	for meter in meters:
+		key = ingest_rollup(meter)
+		if key:
+			acknowledged.append(key)
+
+	return {"acknowledged": acknowledged}
