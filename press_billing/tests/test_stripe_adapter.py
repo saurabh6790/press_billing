@@ -154,3 +154,34 @@ class TestStripeAdapter(GatewayAdapterContract, IntegrationTestCase):
 		adapter = self.make_adapter()
 		with self.assertRaises(GatewayUnsupported):
 			adapter.verify_payment_signature({})
+
+	# --- real StripeObject normalisation (regression) -----------------------
+	# Stripe v15 StripeObjects expose neither .get() nor dict() conversion; the
+	# adapter must normalise responses via to_dict(). Earlier tests mock with
+	# frappe._dict (which has .get), so they don't catch this — construct_from
+	# builds a genuine StripeObject the way the live SDK returns one.
+
+	def test_create_checkout_session_handles_real_stripe_object(self):
+		adapter = self.make_adapter()
+		session = stripe.checkout.Session.construct_from(
+			{"id": "cs_x", "url": "https://checkout.stripe/cs_x"}, "sk_test")
+		with patch.object(stripe.checkout.Session, "create", return_value=session):
+			out = adapter.create_checkout_session(50.0, "EUR", "rcpt", "https://ok", "https://no")
+		self.assertEqual(out["checkout_url"], "https://checkout.stripe/cs_x")
+		self.assertEqual(out["session_id"], "cs_x")
+
+	def test_get_checkout_session_normalises_real_stripe_object(self):
+		adapter = self.make_adapter()
+		session = stripe.checkout.Session.construct_from(
+			{"id": "cs_x", "payment_status": "paid", "payment_intent": "pi_x",
+			 "amount_total": 5000, "currency": "eur"}, "sk_test")
+		with patch.object(stripe.checkout.Session, "retrieve", return_value=session):
+			out = adapter.get_checkout_session("cs_x")
+		self.assertEqual(out["payment_status"], "paid")
+		self.assertEqual(out["payment_intent"], "pi_x")
+
+	def test_get_transaction_status_handles_real_stripe_object(self):
+		adapter = self.make_adapter()
+		intent = stripe.PaymentIntent.construct_from({"id": "pi_x", "status": "succeeded"}, "sk_test")
+		with patch.object(stripe.PaymentIntent, "retrieve", return_value=intent):
+			self.assertEqual(adapter.get_transaction_status("pi_x"), "succeeded")

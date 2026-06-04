@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Frappe and contributors
 # For license information, please see license.txt
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -22,3 +24,27 @@ class TestPaymentGatewaySecrets(IntegrationTestCase):
 		gw = make_stripe_gateway()
 		# Password fieldtype values are not serialised as plaintext in as_dict.
 		self.assertNotEqual(gw.as_dict().get("api_secret"), "sk_test_123")
+
+
+class TestGatewayCredentialResolution(IntegrationTestCase):
+	"""GatewayAdapter.get_credential lets live keys live in common_site_config.json
+	(overriding the Payment Gateway doc) while falling back to the doc otherwise."""
+
+	def test_falls_back_to_doc_when_not_in_site_config(self):
+		from press_billing.gateways.registry import get_adapter
+
+		gw = make_stripe_gateway("GW-Cred-Test")
+		adapter = get_adapter(gw)
+		# stripe_webhook_secret is not in this site's config -> read off the doc.
+		self.assertNotIn("stripe_webhook_secret", frappe.conf)
+		self.assertEqual(adapter.get_credential("webhook_secret"), "whsec_test_123")
+
+	def test_site_config_key_overrides_the_doc(self):
+		from press_billing.gateways.registry import get_adapter
+
+		gw = make_stripe_gateway("GW-Cred-Test2")
+		adapter = get_adapter(gw)
+		with patch.dict(frappe.local.conf, {"stripe_webhook_secret": "whsec_from_conf"}):
+			self.assertEqual(adapter.get_credential("webhook_secret"), "whsec_from_conf")
+		# Override gone -> doc value again.
+		self.assertEqual(adapter.get_credential("webhook_secret"), "whsec_test_123")

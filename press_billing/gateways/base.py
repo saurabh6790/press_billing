@@ -9,6 +9,8 @@ interface; adding a gateway is one subclass passing the shared contract suite.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+import frappe
+
 
 def header_value(headers: dict, name: str):
 	"""Case-insensitive header lookup (werkzeug preserves sent casing)."""
@@ -61,8 +63,24 @@ class GatewayUnsupported(GatewayError):
 class GatewayAdapter(ABC):
 	"""One instance per Payment Gateway config row."""
 
+	# Subclasses map their credential field → the common_site_config.json key
+	# that overrides it. Lets ops keep live secrets in site config instead of
+	# the Payment Gateway doc (DB). Empty = always read from the doc.
+	conf_keys: dict[str, str] = {}
+
 	def __init__(self, gateway):
 		self.gateway = gateway
+
+	def get_credential(self, field: str) -> str | None:
+		"""Resolve a gateway credential, preferring common_site_config.json over
+		the Payment Gateway doc. If `conf_keys[field]` is set in site config we use
+		that; otherwise fall back to the encrypted password on the gateway doc."""
+		conf_key = self.conf_keys.get(field)
+		if conf_key:
+			value = frappe.conf.get(conf_key)
+			if value:
+				return value
+		return self.gateway.get_password(field)
 
 	# --- payment method lifecycle (universal) -------------------------------
 
@@ -104,6 +122,17 @@ class GatewayAdapter(ABC):
 		"""Create a one-time checkout order/intent the client UI completes (top-up).
 		Returns the client-side handles (order_id + key / client_secret)."""
 		raise GatewayUnsupported(f"{type(self).__name__} does not support create_order")
+
+	def create_checkout_session(self, amount, currency: str, receipt: str,
+								success_url: str, cancel_url: str, notes: dict | None = None) -> dict:
+		"""Create a gateway-hosted checkout the client redirects to (Stripe Checkout).
+		Returns `{checkout_url, session_id}`. The wallet is credited only on return,
+		after the session is confirmed paid (see get_checkout_session)."""
+		raise GatewayUnsupported(f"{type(self).__name__} does not support create_checkout_session")
+
+	def get_checkout_session(self, session_id: str) -> dict:
+		"""Retrieve a hosted-checkout session to confirm it was paid (server-side)."""
+		raise GatewayUnsupported(f"{type(self).__name__} does not support get_checkout_session")
 
 	def create_customer(self, team) -> str:
 		raise GatewayUnsupported(f"{type(self).__name__} does not support create_customer")

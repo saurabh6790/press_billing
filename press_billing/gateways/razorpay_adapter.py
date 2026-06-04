@@ -29,9 +29,16 @@ _TRANSIENT = (
 
 
 class RazorpayAdapter(GatewayAdapter):
+	# common_site_config.json overrides for live keys (see GatewayAdapter.get_credential).
+	conf_keys = {
+		"api_key": "razorpay_key_id",
+		"api_secret": "razorpay_key_secret",
+		"webhook_secret": "razorpay_webhook_secret",
+	}
+
 	def _client(self):
 		return razorpay.Client(
-			auth=(self.gateway.get_password("api_key"), self.gateway.get_password("api_secret"))
+			auth=(self.get_credential("api_key"), self.get_credential("api_secret"))
 		)
 
 	def setup_payment_method(self, team, setup_data: dict) -> dict:
@@ -56,7 +63,7 @@ class RazorpayAdapter(GatewayAdapter):
 		return {
 			"order_id": order.get("id"),
 			"customer_id": setup_data.get("customer_id"),
-			"key_id": self.gateway.get_password("api_key"),
+			"key_id": self.get_credential("api_key"),
 		}
 
 	def validate_payment_method(self, payment_method) -> bool:
@@ -132,7 +139,7 @@ class RazorpayAdapter(GatewayAdapter):
 
 	def verify_webhook_signature(self, payload: bytes, headers: dict) -> bool:
 		"""HMAC-verify the raw webhook body. No DB writes; first security gate."""
-		secret = self.gateway.get_password("webhook_secret")
+		secret = self.get_credential("webhook_secret")
 		signature = header_value(headers, "X-Razorpay-Signature")
 		body = payload.decode() if isinstance(payload, bytes) else payload
 		try:
@@ -160,7 +167,7 @@ class RazorpayAdapter(GatewayAdapter):
 			"receipt": receipt,
 			"notes": notes or {},
 		})
-		return {"order_id": order.get("id"), "key_id": self.gateway.get_password("api_key"),
+		return {"order_id": order.get("id"), "key_id": self.get_credential("api_key"),
 				"amount": order.get("amount"), "currency": (currency or "INR").upper()}
 
 	def create_customer(self, team) -> str:

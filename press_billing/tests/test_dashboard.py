@@ -200,3 +200,37 @@ class TestGatewayTopUp(CustomerDataBase):
 				dashboard.confirm_topup(team=TEAM, amount=5000, gateway=gw,
 					razorpay_order_id="o", razorpay_payment_id="p", razorpay_signature="bad")
 		self.assertEqual(dashboard.get_credit_balance(TEAM)["balance"], 0)  # no magic credit
+
+	def test_topup_stripe_uses_hosted_checkout_and_confirms_via_session(self):
+		"""A Stripe (e.g. EUR) team gets a hosted Checkout redirect, and the wallet
+		is credited from the server-confirmed session amount/currency — not INR."""
+		from unittest.mock import MagicMock, patch
+		from press_billing.tests.test_stripe_adapter import make_stripe_gateway
+
+		gw = make_stripe_gateway("GW-Cust-Stripe-T").name
+		adapter = MagicMock()
+		adapter.create_checkout_session.return_value = {"checkout_url": "https://stripe.test/cs", "session_id": "cs_x"}
+		adapter.get_checkout_session.return_value = {
+			"payment_status": "paid", "payment_intent": "pi_x", "amount_total": 500000, "currency": "eur"}
+		with patch("press_billing.gateways.registry.get_adapter", return_value=adapter):
+			order = dashboard.create_topup_order(team=TEAM, amount=5000, gateway=gw)
+			self.assertEqual(order["adapter_key"], "stripe")
+			self.assertEqual(order["checkout_url"], "https://stripe.test/cs")  # redirect, not a Razorpay order
+			adapter.create_checkout_session.assert_called_once()
+			self.assertEqual(dashboard.get_credit_balance(TEAM)["balance"], 0)  # not credited yet
+
+			out = dashboard.confirm_topup(team=TEAM, amount=5000, gateway=gw, session="cs_x")
+			adapter.get_checkout_session.assert_called_once_with("cs_x")
+			self.assertEqual(out["new_balance"], 5000)
+
+	def test_topup_stripe_rejects_unpaid_session(self):
+		from unittest.mock import MagicMock, patch
+		from press_billing.tests.test_stripe_adapter import make_stripe_gateway
+
+		gw = make_stripe_gateway("GW-Cust-Stripe-T2").name
+		adapter = MagicMock()
+		adapter.get_checkout_session.return_value = {"payment_status": "unpaid", "payment_intent": "pi_y"}
+		with patch("press_billing.gateways.registry.get_adapter", return_value=adapter):
+			with self.assertRaises(frappe.ValidationError):
+				dashboard.confirm_topup(team=TEAM, amount=5000, gateway=gw, session="cs_y")
+		self.assertEqual(dashboard.get_credit_balance(TEAM)["balance"], 0)  # no magic credit

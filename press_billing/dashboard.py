@@ -53,6 +53,19 @@ def _team_currency(team: str) -> str:
 	return frappe.db.get_value("Price Lock", {"team": team}, "currency") or "INR"
 
 
+def _gateway_for_currency(currency: str) -> str:
+	"""Pick the enabled gateway that settles in this currency (e.g. EUR → Stripe,
+	INR → Razorpay), preferring the one flagged default-for-currency. A team must
+	never be sent to a gateway that can't take its currency."""
+	gw = (frappe.db.get_value("Payment Gateway",
+			{"currency": currency, "is_enabled": 1, "is_default_for_currency": 1}, "name")
+		or frappe.db.get_value("Payment Gateway",
+			{"currency": currency, "is_enabled": 1}, "name"))
+	if not gw:
+		frappe.throw(f"No payment gateway configured for {currency} top-ups.", frappe.ValidationError)
+	return gw
+
+
 @frappe.whitelist()
 def get_forecast(team: str | None = None) -> dict:
 	"""Current-month forecast: projected month-end bill vs credit balance.
@@ -174,6 +187,24 @@ def _describe_line(team: str, li) -> dict:
 		else:
 			row["detail"] = f"{frappe.utils.flt(li.quantity):g} {unit} metered"
 	return row
+
+
+@frappe.whitelist()
+def list_payment_attempts(team: str | None = None, limit: int = 100) -> list[dict]:
+	"""Payment attempt history — every charge against the team's card/mandate,
+	including the failed dunning retries that lead to suspension. This is the
+	customer's record of WHY a card-on-file team can still be past_due/suspended.
+	"""
+	team = _resolve_team(team)
+	return frappe.get_all(
+		"Payment Attempt",
+		filters={"team": team},
+		fields=["name", "status", "amount", "currency", "gateway", "invoice",
+				"failure_code", "failure_reason", "retry_number",
+				"gateway_transaction_id", "creation"],
+		order_by="creation desc",
+		limit=limit,
+	)
 
 
 @frappe.whitelist()
@@ -348,38 +379,68 @@ def create_topup_order(team=None, amount=None, gateway=None) -> dict:
 	amount = frappe.utils.flt(amount)
 	if amount <= 0:
 		frappe.throw("Top-up amount must be greater than zero.", frappe.ValidationError)
-	gw = gateway or frappe.db.get_value("Payment Gateway", {"adapter_key": "razorpay", "is_enabled": 1}, "name")
-	if not gw:
-		frappe.throw("No payment gateway configured for top-ups.", frappe.ValidationError)
+	currency = _team_currency(team)
+	gw = gateway or _gateway_for_currency(currency)
 	from press_billing.gateways.registry import get_adapter
 
-	adapter = get_adapter(frappe.get_doc("Payment Gateway", gw))
+	gw_doc = frappe.get_doc("Payment Gateway", gw)
+	adapter = get_adapter(gw_doc)
 	receipt = f"topup-{team}-{frappe.generate_hash(8)}"
-	handles = adapter.create_order(amount, "INR", receipt, notes={"team": team, "purpose": "wallet_topup"})
-	return {"gateway": gw, "adapter_key": frappe.db.get_value("Payment Gateway", gw, "adapter_key"),
-			"amount": amount, "receipt": receipt, **handles}
+	notes = {"team": team, "purpose": "wallet_topup"}
+	if gw_doc.adapter_key == "stripe":
+		# Hosted Stripe Checkout: the SPA redirects out and returns to /billing/credits,
+		# which confirms the session. Stripe fills in {CHECKOUT_SESSION_ID}.
+		from urllib.parse import quote
+
+		base = frappe.utils.get_url()
+		success_url = (f"{base}/billing/credits?topup=success&gateway={quote(gw)}"
+					   f"&team={quote(team)}&session={{CHECKOUT_SESSION_ID}}")
+		cancel_url = f"{base}/billing/credits?topup=cancelled"
+		handles = adapter.create_checkout_session(amount, currency, receipt, success_url, cancel_url, notes=notes)
+	else:
+		handles = adapter.create_order(amount, currency, receipt, notes=notes)
+	return {"gateway": gw, "adapter_key": gw_doc.adapter_key,
+			"amount": amount, "currency": currency, "receipt": receipt, **handles}
 
 
 @frappe.whitelist()
 def confirm_topup(team=None, amount=None, gateway=None, razorpay_order_id=None,
-				  razorpay_payment_id=None, razorpay_signature=None) -> dict:
-	"""Credit the wallet only after the gateway signature verifies — the money
-	really moved at the gateway first."""
+				  razorpay_payment_id=None, razorpay_signature=None, session=None) -> dict:
+	"""Credit the wallet only after the gateway confirms the money really moved.
+	Razorpay confirms via the checkout-callback signature; Stripe confirms by
+	retrieving the hosted Checkout session and checking it was paid (and credits
+	the server-confirmed amount, not a client-supplied one). The wallet is credited
+	in the team's own currency — never assumed INR."""
 	team = _resolve_team(team)
+	currency = _team_currency(team)
+	amount = frappe.utils.flt(amount)
 	from press_billing.gateways.registry import get_adapter
 
-	adapter = get_adapter(frappe.get_doc("Payment Gateway", gateway))
-	ok = adapter.verify_payment_signature({
-		"razorpay_order_id": razorpay_order_id,
-		"razorpay_payment_id": razorpay_payment_id,
-		"razorpay_signature": razorpay_signature,
-	})
+	gw_doc = frappe.get_doc("Payment Gateway", gateway)
+	adapter = get_adapter(gw_doc)
+	if gw_doc.adapter_key == "razorpay":
+		ok = adapter.verify_payment_signature({
+			"razorpay_order_id": razorpay_order_id,
+			"razorpay_payment_id": razorpay_payment_id,
+			"razorpay_signature": razorpay_signature,
+		})
+		reference = razorpay_payment_id
+	else:
+		# Hosted-checkout gateways (Stripe): trust the session the gateway confirms,
+		# including the amount/currency it actually charged.
+		checkout = adapter.get_checkout_session(session)
+		ok = checkout.get("payment_status") == "paid"
+		reference = checkout.get("payment_intent")
+		if checkout.get("amount_total"):
+			amount = frappe.utils.flt(checkout["amount_total"]) / 100
+		if checkout.get("currency"):
+			currency = checkout["currency"].upper()
 	if not ok:
-		frappe.throw("Payment signature verification failed.", frappe.ValidationError)
+		frappe.throw("Payment confirmation failed.", frappe.ValidationError)
 	from press_billing import credits
 
-	return credits.purchase(team, frappe.utils.flt(amount), "INR",
-		reference_name=razorpay_payment_id, note=f"Wallet top-up ({razorpay_payment_id})")
+	return credits.purchase(team, amount, currency,
+		reference_name=reference, note=f"Wallet top-up ({reference})")
 
 
 @frappe.whitelist()
@@ -409,6 +470,15 @@ def confirm_payment_method_order(payment_method=None, razorpay_payment_id=None,
 	return {"payment_method": method.name, "status": method.status}
 
 
+# Tier caps (max_spend) are stored in INR; convert to the team's billing currency
+# so a EUR/USD team sees a coherent cap-vs-spend comparison.
+_FX_TO_INR = {"INR": 1.0, "EUR": 90.0, "USD": 83.0}
+
+
+def _from_inr(amount: float, currency: str) -> float:
+	return frappe.utils.flt(frappe.utils.flt(amount) / _FX_TO_INR.get(currency, 1.0), 2)
+
+
 @frappe.whitelist()
 def get_team_overview(team: str | None = None) -> dict:
 	"""Team header: trust tier, account standing, payment mode, resource count."""
@@ -418,9 +488,66 @@ def get_team_overview(team: str | None = None) -> dict:
 	mode = frappe.db.get_value("Billing Profile", team, "billing_mode") or "postpaid"
 	resources = frappe.db.count("Price Lock", {"team": team, "ended_at": ["is", "not set"]})
 	clusters = len(_team_clusters(team))
-	return {"team": team, "tier": tier.get("tier"), "max_spend": frappe.utils.flt(tier.get("max_spend")),
+	currency = _team_currency(team)
+	return {"team": team, "tier": tier.get("tier"),
+			"max_spend": _from_inr(tier.get("max_spend"), currency),
 			"standing": standing, "billing_mode": mode, "resources": resources, "clusters": clusters,
-			"currency": _team_currency(team)}
+			"currency": currency}
+
+
+@frappe.whitelist()
+def get_trust_tier(team: str | None = None) -> dict:
+	"""What the team's trust tier offers, and how to reach the next level.
+
+	Returns the current tier's limits (spend cap in billing currency, resource
+	cap), the team's progress (resources used, paid invoices, cumulative paid),
+	and the NEXT tier's promotion criteria — so a customer can see what unlocks
+	more headroom.
+	"""
+	team = _resolve_team(team)
+	currency = _team_currency(team)
+	tt = frappe.db.get_value("Trust Tier", team, ["tier", "level", "max_spend", "max_resource_count"], as_dict=True) or {}
+
+	levels = frappe.get_all(
+		"Trust Tier Level",
+		fields=["name", "tier", "sequence", "max_spend", "max_resource_count",
+				"min_paid_invoices", "min_cumulative_paid"],
+		order_by="sequence asc",
+	)
+	current_seq = next((l.sequence for l in levels if l.tier == tt.get("tier")), None)
+	current = next((l for l in levels if l.tier == tt.get("tier")), None)
+	nxt = next((l for l in levels if current_seq is not None and l.sequence == current_seq + 1), None)
+
+	# Progress signals toward the next level.
+	resources_used = frappe.db.count("Price Lock", {"team": team, "ended_at": ["is", "not set"]})
+	paid_invoices = frappe.db.count("Invoice", {"team": team, "status": "Paid", "invoice_type": "billable"})
+	paid_rows = frappe.get_all("Invoice", {"team": team, "status": "Paid", "invoice_type": "billable"},
+							   ["amount_paid", "currency"])
+	cumulative_paid_inr = sum(frappe.utils.flt(r.amount_paid) * _FX_TO_INR.get(r.currency, 1.0) for r in paid_rows)
+
+	def level_view(l):
+		if not l:
+			return None
+		return {
+			"tier": l.tier, "sequence": l.sequence,
+			"max_spend": _from_inr(l.max_spend, currency),
+			"max_resource_count": l.max_resource_count,
+			"min_paid_invoices": l.min_paid_invoices,
+			"min_cumulative_paid": _from_inr(l.min_cumulative_paid, currency),
+		}
+
+	return {
+		"team": team, "currency": currency,
+		"current": level_view(current),
+		"next": level_view(nxt),
+		"is_top_tier": nxt is None,
+		"progress": {
+			"resources_used": resources_used,
+			"paid_invoices": paid_invoices,
+			"cumulative_paid": _from_inr(cumulative_paid_inr, currency),
+		},
+		"all_levels": [level_view(l) for l in levels],
+	}
 
 
 @frappe.whitelist()
