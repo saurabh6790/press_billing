@@ -159,42 +159,52 @@ def _build_team(team, tier, currency, months, state, resources):
 					"idempotency_key": f"{resource}:counter:{ANCHOR}", "status": "closed",
 				}])
 
-	# One subscription + invoice stream per cluster (an invoice groups a cluster's
-	# instances into day-weighted line items). The terminal state lands on the
-	# primary cluster; other clusters simply carry an Open current invoice.
-	notes = []
-	for primary, (cluster, plans) in enumerate(by_cluster.items()):
-		sub = subscriptions.create_subscription(
+	# One subscription per cluster carries the per-region billing intent (and the
+	# default payment method that funds the auto-charge). But the customer sees a
+	# SINGLE consolidated invoice per month — generate_team_invoice rolls every
+	# cluster's day-weighted lines + overage into one Invoice per period.
+	subs = []
+	for cluster, plans in by_cluster.items():
+		subs.append(subscriptions.create_subscription(
 			team=team, cluster=cluster, plan=plans[0], billing_cycle="monthly",
 			default_payment_method=pm, gateway=gateway,
-		).name
-		for start, end in periods:
-			inv = billing.generate_draft_invoice(sub, start, end)
-			if inv:
-				total = frappe.db.get_value("Invoice", inv, "expected_collection")
-				frappe.db.set_value("Invoice", inv, {
-					"status": "Paid", "amount_paid": total, "due_date": frappe.utils.add_days(end, 7),
-				})
-		notes.append(_finish_current_month(team, sub, currency, state if primary == 0 else "active", pm, gateway))
+		).name)
+	primary_sub = subs[0]
 
-	return f"{len(resources)} instances across {len(by_cluster)} region(s) — " + "; ".join(n for n in notes if n)
+	for start, end in periods:
+		inv = billing.generate_team_invoice(team, start, end, subscription=primary_sub)
+		if inv:
+			total = frappe.db.get_value("Invoice", inv, "expected_collection")
+			frappe.db.set_value("Invoice", inv, {
+				"status": "Paid", "amount_paid": total, "due_date": frappe.utils.add_days(end, 7),
+			})
+
+	note = _finish_current_month(team, primary_sub, currency, state, pm, gateway)
+	return f"{len(resources)} instances across {len(by_cluster)} region(s) — {note}"
+
+
+def _set_team_standing(team, standing, changed_by="dunning"):
+	"""Move every one of the team's subscriptions to a standing (the team — not a
+	single region — is past_due/suspended)."""
+	for s in frappe.get_all("Subscription", {"team": team}, pluck="name"):
+		subscriptions.set_standing(s, standing, changed_by=changed_by)
 
 
 def _finish_current_month(team, sub, currency, state, pm, gateway):
-	"""Build the open/June invoice in the team's terminal state."""
+	"""Build the open/June invoice (one consolidated invoice) in the team's terminal state."""
 	if state == "trial":
-		inv = billing.generate_draft_invoice(sub, ANCHOR, "2026-06-30")
+		inv = billing.generate_team_invoice(team, ANCHOR, "2026-06-30", subscription=sub)
 		if inv:
 			billing.open_and_collect(inv)  # cost_report → opened, never charged
 		return "trial cost report"
 
-	inv = billing.generate_draft_invoice(sub, ANCHOR, "2026-06-30")
+	inv = billing.generate_team_invoice(team, ANCHOR, "2026-06-30", subscription=sub)
 	if not inv:
 		return state
 
 	if state == "overdue":
 		frappe.db.set_value("Invoice", inv, {"status": "Overdue", "due_date": "2026-06-01", "amount_paid": 0})
-		subscriptions.set_standing(sub, "past_due", changed_by="dunning")
+		_set_team_standing(team, "past_due")
 		for n in range(3):
 			_failed_attempt(team, inv, pm, gateway, n)
 			notifications.notify(team, "payment_retry",
@@ -206,14 +216,21 @@ def _finish_current_month(team, sub, currency, state, pm, gateway):
 
 	if state == "suspended":
 		frappe.db.set_value("Invoice", inv, {"status": "Overdue", "due_date": "2026-05-20", "amount_paid": 0})
-		subscriptions.set_standing(sub, "past_due", changed_by="dunning")
-		subscriptions.set_standing(sub, "suspended", changed_by="dunning")
+		_set_team_standing(team, "past_due")
+		# Suspension follows EXHAUSTED dunning — the card on file was charged and
+		# declined on each retry. Those attempts are non-negotiable history.
+		for n in range(3):
+			_failed_attempt(team, inv, pm, gateway, n)
+			notifications.notify(team, "payment_retry",
+				message=f"Payment retry {n + 1} for {inv} failed: card_declined",
+				reference_doctype="Invoice", reference_name=inv)
+		_set_team_standing(team, "suspended")
 		from press_billing.entitlements import issue_token
 
 		issue_token(team, {}, suspend=True)
 		notifications.notify(team, "invoice_overdue", context={"invoice": inv},
 			reference_doctype="Invoice", reference_name=inv)
-		return "Suspended + cap-0 suspend token"
+		return "Suspended + 3 failed retries + cap-0 suspend token"
 
 	if state == "credits":
 		# Deliberately under-fund so the prepaid shortfall + credit alert show.

@@ -14,6 +14,9 @@ from press_billing.security import require_billing_admin
 
 AGING_BUCKETS = [("0-7", 0, 7), ("8-15", 8, 15), ("16-30", 16, 30), ("30+", 31, 10**9)]
 _BILLABLE_LIVE = ("Open", "Paid", "Overdue")
+# Teams bill in mixed currencies; normalise revenue to INR for one comparable axis.
+_FX_TO_INR = {"INR": 1.0, "EUR": 90.0, "USD": 83.0}
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 def _period_filter(field, from_date, to_date):
@@ -25,19 +28,25 @@ def _period_filter(field, from_date, to_date):
 	return f
 
 
+def _to_inr(amount, currency) -> float:
+	"""Normalise a native-currency amount to an INR-equivalent for cross-team
+	aggregates (teams bill in INR/EUR/USD; summing raw would be meaningless)."""
+	return frappe.utils.flt(amount) * _FX_TO_INR.get(currency, 1.0)
+
+
 @frappe.whitelist()
 def get_summary(from_date=None, to_date=None) -> dict:
-	"""Total billed / collected / outstanding across all teams for the period."""
+	"""Total billed / collected / outstanding across all teams (INR-equivalent)."""
 	require_billing_admin()
 	invoices = frappe.get_all(
 		"Invoice",
 		filters=[["invoice_type", "=", "billable"]] + _period_filter("period_start", from_date, to_date),
-		fields=["status", "total", "amount_paid"],
+		fields=["status", "total", "amount_paid", "currency"],
 	)
-	billed = sum(frappe.utils.flt(i.total) for i in invoices)
-	collected = sum(frappe.utils.flt(i.amount_paid) for i in invoices)
+	billed = sum(_to_inr(i.total, i.currency) for i in invoices)
+	collected = sum(_to_inr(i.amount_paid, i.currency) for i in invoices)
 	outstanding = sum(
-		frappe.utils.flt(i.total) - frappe.utils.flt(i.amount_paid)
+		_to_inr(i.total, i.currency) - _to_inr(i.amount_paid, i.currency)
 		for i in invoices if i.status in ("Open", "Overdue")
 	)
 	by_status = {}
@@ -49,7 +58,41 @@ def get_summary(from_date=None, to_date=None) -> dict:
 		"outstanding": frappe.utils.flt(outstanding, 2),
 		"invoice_count": len(invoices),
 		"by_status": by_status,
+		"currency": "INR",
 	}
+
+
+@frappe.whitelist()
+def get_revenue_trend(months: int = 12) -> list[dict]:
+	"""Monthly billed vs collected (INR-normalised) — the headline revenue chart.
+
+	Invoices carry mixed currencies, so each is converted to INR at a flat demo FX
+	rate before bucketing by billing month, giving one comparable revenue axis.
+	"""
+	require_billing_admin()
+	buckets = {}
+	for inv in frappe.get_all(
+		"Invoice",
+		filters={"invoice_type": "billable"},
+		fields=["period_start", "total", "amount_paid", "currency"],
+	):
+		if not inv.period_start:
+			continue
+		key = str(inv.period_start)[:7]  # YYYY-MM
+		fx = _FX_TO_INR.get(inv.currency, 1.0)
+		b = buckets.setdefault(key, {"billed": 0.0, "collected": 0.0})
+		b["billed"] += frappe.utils.flt(inv.total) * fx
+		b["collected"] += frappe.utils.flt(inv.amount_paid) * fx
+	rows = []
+	for key in sorted(buckets)[-months:]:
+		y, m = key.split("-")
+		rows.append({
+			"month": key,
+			"label": f"{_MONTHS[int(m) - 1]} {y[2:]}",
+			"billed": frappe.utils.flt(buckets[key]["billed"], 2),
+			"collected": frappe.utils.flt(buckets[key]["collected"], 2),
+		})
+	return rows
 
 
 @frappe.whitelist()
@@ -162,20 +205,107 @@ def get_free_trial_costs(from_date=None, to_date=None) -> dict:
 
 @frappe.whitelist()
 def get_team_billing(team: str) -> dict:
-	"""Team lookup — any team's full billing picture (admin only)."""
+	"""Team lookup — any team's full billing picture (admin only).
+
+	Amounts here are in the team's OWN billing currency (not INR-normalised) —
+	this is the record-level view, so €/$ teams read in their real currency.
+	"""
 	require_billing_admin()
+	currency = _team_currency(team)
 	return {
 		"team": team,
+		"currency": currency,
+		"tier": frappe.db.get_value("Trust Tier", team, "tier") or "—",
 		"subscriptions": frappe.get_all(
 			"Subscription", filters={"team": team},
 			fields=["name", "plan", "cluster", "account_standing"]),
 		"invoices": frappe.get_all(
 			"Invoice", filters={"team": team},
-			fields=["name", "status", "total", "amount_paid", "period_end"], order_by="period_start desc"),
+			fields=["name", "status", "total", "amount_paid", "currency", "period_end"], order_by="period_start desc"),
 		"payment_attempts": frappe.get_all(
 			"Payment Attempt", filters={"team": team},
-			fields=["name", "status", "amount", "gateway", "resolved_by"], order_by="creation desc"),
+			fields=["name", "status", "amount", "currency", "gateway", "failure_code", "resolved_by"], order_by="creation desc"),
 		"credit_balance": frappe.utils.flt(credits.get_balance(team)["balance"]),
+	}
+
+
+@frappe.whitelist()
+def list_all_invoices(status: str = None, team: str = None, limit: int = 500) -> list[dict]:
+	"""Global invoice list (admin) with optional status/team filters — the
+	drill-down target for the Collected / Outstanding cards.
+
+	`status` accepts a literal Invoice status (Paid/Open/Overdue/Draft/…) or the
+	pseudo-filters `outstanding` (Open+Overdue) and `paid`.
+	"""
+	require_billing_admin()
+	filters = {"invoice_type": "billable"}
+	if team:
+		filters["team"] = team
+	if status == "outstanding":
+		filters["status"] = ["in", ["Open", "Overdue"]]
+	elif status == "paid":
+		filters["status"] = "Paid"
+	elif status:
+		filters["status"] = status.title()
+	rows = frappe.get_all(
+		"Invoice", filters=filters,
+		fields=["name", "team", "status", "total", "amount_paid", "currency",
+				"period_start", "period_end", "due_date"],
+		order_by="period_start desc, team asc", limit=limit,
+	)
+	for r in rows:
+		r["outstanding"] = frappe.utils.flt(frappe.utils.flt(r.total) - frappe.utils.flt(r.amount_paid), 2)
+	return rows
+
+
+@frappe.whitelist()
+def get_catalog() -> dict:
+	"""Products & infrastructure: plans (with INR base rate), add-ons, and the
+	clusters teams run in (with active resource counts)."""
+	require_billing_admin()
+	plans = []
+	for p in frappe.get_all("Plan", fields=["name", "title", "billing_cycle", "is_active"], order_by="name asc"):
+		plans.append({
+			**p,
+			"inr_rate": _plan_monthly_inr(p.name, None),
+			"active_resources": frappe.db.count("Price Lock", {"plan": p.name, "ended_at": ["is", "not set"]}),
+		})
+	addons = frappe.get_all("Add-on", fields=["name", "title", "resource_type", "unit", "billing_type"], order_by="name asc")
+	clusters = {}
+	for lock in _active_locks():
+		c = clusters.setdefault(lock.cluster or "global", {"cluster": lock.cluster or "global", "resources": 0, "teams": set()})
+		c["resources"] += 1
+		c["teams"].add(lock.team)
+	cluster_rows = sorted(
+		({"cluster": c["cluster"], "resources": c["resources"], "teams": len(c["teams"])} for c in clusters.values()),
+		key=lambda r: r["resources"], reverse=True,
+	)
+	return {"plans": plans, "addons": addons, "clusters": cluster_rows}
+
+
+@frappe.whitelist()
+def get_retention() -> dict:
+	"""Customer retention snapshot: active vs at-risk vs churned, and a retention
+	rate. A team is churned when its only standing is suspended; at-risk when
+	past_due; retained otherwise."""
+	require_billing_admin()
+	standing = {}
+	for s in frappe.get_all("Subscription", fields=["team", "account_standing"]):
+		cur = standing.get(s.team, "current")
+		standing[s.team] = s.account_standing if _STANDING_RANK.get(s.account_standing, 0) > _STANDING_RANK.get(cur, 0) else cur
+	total = len(standing)
+	active = sum(1 for v in standing.values() if v == "current")
+	at_risk = sum(1 for v in standing.values() if v == "past_due")
+	churned = sum(1 for v in standing.values() if v == "suspended")
+	rows = [{"team": t, "standing": v} for t, v in sorted(standing.items())]
+	return {
+		"total_teams": total,
+		"active": active,
+		"at_risk": at_risk,
+		"churned": churned,
+		"retention_rate": round((total - churned) / total, 3) if total else 0,
+		"active_rate": round(active / total, 3) if total else 0,
+		"teams": rows,
 	}
 
 
@@ -263,13 +393,20 @@ def list_teams() -> list[dict]:
 			teams[lock.team]["resources"] += 1
 	rows = []
 	for t in teams.values():
+		currency = _team_currency(t["team"])
 		t["mrr"] = frappe.utils.flt(t["mrr"], 2)
 		t["tier"] = frappe.db.get_value("Trust Tier", t["team"], "tier") or "—"
 		t["open_invoices"] = frappe.db.count("Invoice", {"team": t["team"], "status": ["in", ["Open", "Overdue"]]})
 		t["invoices"] = frappe.db.count("Invoice", {"team": t["team"]})
-		t["credit_balance"] = frappe.utils.flt(credits.get_balance(t["team"])["balance"])
+		# Credit normalised to INR so the whole row reads on one (INR-equiv.) axis.
+		t["credit_balance"] = frappe.utils.flt(_to_inr(credits.get_balance(t["team"])["balance"], currency), 2)
+		t["currency"] = currency
 		rows.append(t)
 	return sorted(rows, key=lambda r: r["mrr"], reverse=True)
+
+
+def _team_currency(team: str) -> str:
+	return frappe.db.get_value("Price Lock", {"team": team}, "currency") or "INR"
 
 
 @frappe.whitelist()
@@ -278,7 +415,7 @@ def get_payment_failures(limit: int = 50) -> list[dict]:
 	require_billing_admin()
 	return frappe.get_all(
 		"Payment Attempt", filters={"status": "failed"},
-		fields=["name", "team", "invoice", "amount", "gateway", "failure_code", "failure_reason", "creation"],
+		fields=["name", "team", "invoice", "amount", "currency", "gateway", "failure_code", "failure_reason", "creation"],
 		order_by="creation desc", limit=limit)
 
 
@@ -342,6 +479,47 @@ def get_conversion() -> dict:
 	converted = sum(1 for t in tiers if (t.promotion_basis or "").startswith("converted"))
 	return {"total_teams": total, "trial": trial, "paid": paid, "converted": converted,
 			"conversion_rate": round(paid / total, 3) if total else 0}
+
+
+@frappe.whitelist()
+def get_trial_detail() -> dict:
+	"""Trial subsidy analysis with full provenance: how many teams are still on
+	trial, the per-team subsidy, and the exact cost_report invoices the total is
+	summed from (so 'where does ₹X come from?' is answerable)."""
+	require_billing_admin()
+	from press_billing.trials import entry_tier
+
+	entry = entry_tier()
+	invoices = frappe.get_all(
+		"Invoice", filters={"invoice_type": "cost_report"},
+		fields=["name", "team", "subtotal", "currency", "period_start", "period_end"],
+		order_by="period_start desc",
+	)
+	by_team = {}
+	still_on_trial, converted_subsidy, trial_subsidy = 0.0, 0.0, 0.0
+	for inv in invoices:
+		tier = frappe.db.get_value("Trust Tier", inv.team, "tier")
+		on_trial = tier == entry
+		inr = _to_inr(inv.subtotal, inv.currency)
+		t = by_team.setdefault(inv.team, {"team": inv.team, "on_trial": on_trial, "tier": tier or "—",
+											"subsidy": 0.0, "currency": inv.currency, "invoices": []})
+		t["subsidy"] = frappe.utils.flt(t["subsidy"] + frappe.utils.flt(inv.subtotal), 2)
+		t["invoices"].append({"name": inv.name, "subtotal": frappe.utils.flt(inv.subtotal, 2),
+							   "period_start": str(inv.period_start), "period_end": str(inv.period_end)})
+		if on_trial:
+			trial_subsidy += inr
+		else:
+			converted_subsidy += inr
+	teams = sorted(by_team.values(), key=lambda r: r["subsidy"], reverse=True)
+	return {
+		"entry_tier": entry,
+		"still_on_trial": sum(1 for t in teams if t["on_trial"]),
+		"converted": sum(1 for t in teams if not t["on_trial"]),
+		"trial_subsidy_inr": frappe.utils.flt(trial_subsidy, 2),
+		"converted_subsidy_inr": frappe.utils.flt(converted_subsidy, 2),
+		"total_subsidy_inr": frappe.utils.flt(trial_subsidy + converted_subsidy, 2),
+		"teams": teams,
+	}
 
 
 @frappe.whitelist()

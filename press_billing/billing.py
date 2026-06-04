@@ -171,20 +171,100 @@ def generate_draft_invoice(subscription: str, period_start, period_end):
 	return invoice.name
 
 
+def generate_team_invoice(team: str, period_start, period_end, subscription: str | None = None):
+	"""One consolidated invoice per team per period, across every cluster it runs in.
+
+	A team that runs instances in several regions should see a SINGLE monthly
+	invoice, not one per region — so this aggregates the day-weighted fixed lines
+	plus metered overage from all of the team's clusters into one Invoice.
+	Idempotent per (team, period): a second call returns the existing invoice.
+
+	`subscription` is the primary subscription (its default payment method funds
+	the auto-charge in open_and_collect); defaults to any of the team's subs.
+	"""
+	existing = frappe.db.get_value(
+		"Invoice",
+		{
+			"team": team,
+			"period_start": period_start,
+			"period_end": period_end,
+			"status": ["!=", "Cancelled"],
+		},
+		"name",
+	)
+	if existing:
+		return existing
+
+	from press_billing.metering import metered_line_items
+	from press_billing.tax import resolve_tax
+	from press_billing.trials import invoice_type_for
+
+	clusters = sorted(c for c in set(frappe.get_all("Price Lock", {"team": team}, pluck="cluster")) if c)
+	lines = []
+	for cluster in clusters:
+		lines += compute_line_items(team, cluster, period_start, period_end)
+		lines += metered_line_items(team, cluster, period_start, period_end)
+	if not lines:
+		return None
+
+	subtotal = frappe.utils.flt(sum(line["amount"] for line in lines), 2)
+	currency = frappe.db.get_value("Price Lock", {"team": team}, "currency")
+	tax = resolve_tax(team, subtotal)
+	total = frappe.utils.flt(subtotal + tax["output_tax_amount"], 2)
+	expected = frappe.utils.flt(total - tax["tds_amount"], 2)
+	if subscription is None:
+		subscription = frappe.db.get_value("Subscription", {"team": team}, "name")
+
+	invoice = frappe.get_doc(
+		{
+			"doctype": "Invoice",
+			"team": team,
+			"subscription": subscription,
+			"invoice_type": invoice_type_for(team),
+			"status": "Draft",
+			"period_start": period_start,
+			"period_end": period_end,
+			"currency": currency,
+			"items": lines,
+			"subtotal": subtotal,
+			"output_tax_type": tax["output_tax_type"],
+			"output_tax_rate": tax["output_tax_rate"],
+			"output_tax_amount": tax["output_tax_amount"],
+			"zero_rating_reason": tax["zero_rating_reason"],
+			"tds_applicable": tax["tds_applicable"],
+			"tds_rate": tax["tds_rate"],
+			"tds_amount": tax["tds_amount"],
+			"total": total,
+			"credit_applied": 0,
+			"expected_collection": expected,
+			"amount_paid": 0,
+		}
+	).insert(ignore_permissions=True)
+	return invoice.name
+
+
 def generate_draft_invoices(period_start, period_end, enqueue: bool = False) -> list[str]:
-	"""Phase-1 orchestrator: a draft per active subscription for the period."""
-	subs = frappe.get_all("Subscription", pluck="name")
+	"""Phase-1 orchestrator: ONE consolidated draft per team for the period.
+
+	A team that runs instances across several clusters still gets a single
+	invoice (generate_team_invoice aggregates all its clusters). The team's first
+	subscription is the primary (its payment method funds the auto-charge).
+	"""
+	primary = {}
+	for s in frappe.get_all("Subscription", fields=["name", "team"], order_by="creation asc"):
+		primary.setdefault(s.team, s.name)
 	created = []
-	for sub in subs:
+	for team, sub in primary.items():
 		if enqueue:
 			frappe.enqueue(
-				"press_billing.billing.generate_draft_invoice",
-				subscription=sub,
+				"press_billing.billing.generate_team_invoice",
+				team=team,
 				period_start=period_start,
 				period_end=period_end,
+				subscription=sub,
 			)
 			continue
-		name = generate_draft_invoice(sub, period_start, period_end)
+		name = generate_team_invoice(team, period_start, period_end, subscription=sub)
 		if name:
 			created.append(name)
 	return created
