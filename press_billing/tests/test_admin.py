@@ -119,9 +119,7 @@ class TestPriceManagement(AdminTestBase):
 
 		admin.update_plan_rate(PLAN, "INR", 5000)
 		# The live catalog rate moved...
-		plan = frappe.get_doc("Plan", PLAN)
-		inr = next(r for r in plan.rates if r.currency == "INR")
-		self.assertEqual(inr.rate, 5000)
+		self.assertEqual(frappe.get_doc("Plan", PLAN).get_rate("INR"), 5000)
 		# ...but the existing lock is unchanged.
 		self.assertEqual(frappe.db.get_value("Price Lock", {"source_event_id": "evt-lock-x"}, "locked_rate"), 3200)
 		frappe.db.delete("Price Lock", {"team": TEAM_A})

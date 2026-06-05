@@ -5,6 +5,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from press_billing.plans import get_plan_pricing
+from press_billing.pricing import set_catalog_rates
 from press_billing.tests.utils import make_plan
 
 
@@ -47,11 +48,12 @@ class TestPlanIdentity(IntegrationTestCase):
 		name = make_plan("bundle-test-rate-edit")
 		count_before = frappe.db.count("Plan")
 
-		plan = frappe.get_doc("Plan", name)
-		for row in plan.rates:
-			if row.currency == "USD":
-				row.rate = 99
-		plan.save(ignore_permissions=True)
+		# A rate change is editing the plan's Catalog Rate documents, not the plan.
+		set_catalog_rates(
+			"Plan",
+			name,
+			[{"cluster": "", "currency": "USD", "rate": 99}, {"cluster": "", "currency": "INR", "rate": 3200}],
+		)
 
 		self.assertEqual(frappe.db.count("Plan"), count_before)
 		self.assertEqual(get_plan_pricing(plan=name, currency="USD")["rate"], 99)

@@ -4,9 +4,16 @@
 
 import frappe
 
+from press_billing.pricing import set_catalog_rates
+
 DEFAULT_RATES = [
 	{"cluster": "", "currency": "USD", "rate": 40},
 	{"cluster": "", "currency": "INR", "rate": 3200},
+]
+
+DEFAULT_ADDON_RATES = [
+	{"cluster": "", "currency": "USD", "rate": 0.01},
+	{"cluster": "", "currency": "INR", "rate": 0.8},
 ]
 
 DEFAULT_INCLUDES = [
@@ -17,7 +24,7 @@ DEFAULT_INCLUDES = [
 
 
 def make_plan(name, rates=None, includes=None, **kwargs):
-	"""Create (or replace) a bundle Plan and return its name."""
+	"""Create (or replace) a bundle Plan and its Catalog Rate rows; return its name."""
 	if frappe.db.exists("Plan", name):
 		frappe.delete_doc("Plan", name, force=True)
 
@@ -28,16 +35,16 @@ def make_plan(name, rates=None, includes=None, **kwargs):
 			"title": kwargs.get("title", name),
 			"billing_cycle": kwargs.get("billing_cycle", "monthly"),
 			"is_active": kwargs.get("is_active", 1),
-			"rates": rates if rates is not None else DEFAULT_RATES,
 			"includes": includes if includes is not None else DEFAULT_INCLUDES,
 		}
 	)
 	doc.insert(ignore_permissions=True)
+	set_catalog_rates("Plan", doc.name, rates if rates is not None else DEFAULT_RATES)
 	return doc.name
 
 
 def make_addon(name, rates=None, **kwargs):
-	"""Create (or replace) an Add-on and return its name."""
+	"""Create (or replace) an Add-on and its Catalog Rate rows; return its name."""
 	if frappe.db.exists("Add-on", name):
 		frappe.delete_doc("Add-on", name, force=True)
 
@@ -50,13 +57,8 @@ def make_addon(name, rates=None, **kwargs):
 			"unit": kwargs.get("unit", "GB"),
 			"billing_type": kwargs.get("billing_type", "metered"),
 			"billing_interval": kwargs.get("billing_interval", "monthly"),
-			"rates": rates
-			if rates is not None
-			else [
-				{"cluster": "", "currency": "USD", "rate": 0.01},
-				{"cluster": "", "currency": "INR", "rate": 0.8},
-			],
 		}
 	)
 	doc.insert(ignore_permissions=True)
+	set_catalog_rates("Add-on", doc.name, rates if rates is not None else DEFAULT_ADDON_RATES)
 	return doc.name

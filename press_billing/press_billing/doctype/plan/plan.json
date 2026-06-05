@@ -13,8 +13,6 @@
   "column_break_head",
   "billing_cycle",
   "annual_discount_pct",
-  "section_break_rates",
-  "rates",
   "section_break_includes",
   "includes"
  ],
@@ -50,17 +48,6 @@
    "fieldname": "annual_discount_pct",
    "fieldtype": "Float",
    "label": "Annual Discount %"
-  },
-  {
-   "fieldname": "section_break_rates",
-   "fieldtype": "Section Break",
-   "label": "Rates"
-  },
-  {
-   "fieldname": "rates",
-   "fieldtype": "Table",
-   "label": "Rates",
-   "options": "Plan Rate"
   },
   {
    "fieldname": "section_break_includes",

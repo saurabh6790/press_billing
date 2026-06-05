@@ -24,6 +24,7 @@ The Agent-side mirror lives in press_billing_agent.demo.seed.
 import frappe
 
 from press_billing import billing, credits, notifications, subscriptions
+from press_billing.pricing import set_catalog_rates
 from press_billing.sync import receive_meter_rollups, receive_usage_events
 
 # --- catalog shape ----------------------------------------------------------
@@ -280,8 +281,8 @@ def _catalog():
 			for currency in CURRENCIES:
 				rate = round(base_inr * CLUSTER_MULT[cslug] / FX[currency], 2)
 				rates.append({"cluster": cslug, "currency": currency, "rate": rate})
-		_upsert("Plan", slug, {
-			"title": title, "billing_cycle": "monthly", "is_active": 1, "rates": rates,
+		plan = _upsert("Plan", slug, {
+			"title": title, "billing_cycle": "monthly", "is_active": 1,
 			"includes": [
 				{"resource_type": "compute", "quantity": vcpu, "unit": "vCPU"},
 				{"resource_type": "memory", "quantity": ram, "unit": "GB"},
@@ -289,12 +290,15 @@ def _catalog():
 				{"resource_type": "transfer", "quantity": transfer, "unit": "GB"},
 			],
 		}, newname=True)
+		set_catalog_rates("Plan", plan, rates)
 
-	_upsert("Add-on", ADDON, {
+	addon = _upsert("Add-on", ADDON, {
 		"title": "Bandwidth Overage", "resource_type": "transfer", "unit": "GB",
 		"billing_type": "metered", "billing_interval": "monthly",
-		"rates": [{"cluster": "", "currency": c, "rate": ADDON_RATE[c]} for c in CURRENCIES],
 	}, newname=True)
+	set_catalog_rates(
+		"Add-on", addon, [{"cluster": "", "currency": c, "rate": ADDON_RATE[c]} for c in CURRENCIES]
+	)
 
 
 def _gateways():
@@ -411,7 +415,7 @@ def _ensure_signing_key():
 
 def _wipe_all():
 	"""Drop every press_billing record so the demo is the only data present."""
-	children = ("Plan Rate", "Plan Includes", "Add-on Rate", "Invoice Line Item",
+	children = ("Catalog Rate", "Plan Includes", "Invoice Line Item",
 				"Subscription Change")
 	transactional = ("Invoice", "Payment Attempt", "Refund", "Payment Method", "Price Lock",
 					 "Usage Rollup", "Credit Ledger Entry", "Credit Wallet", "Notification Log",

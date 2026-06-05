@@ -11,7 +11,7 @@ like fixed prices are grandfathered by the price-lock.
 
 import frappe
 
-from press_billing.pricing import resolve_rate
+from press_billing.pricing import get_catalog_rates, resolve_rate
 
 
 def _locked_terms(resource_id: str, resource_type: str):
@@ -43,8 +43,9 @@ def _locked_terms(resource_id: str, resource_type: str):
 	rate = 0
 	addon = frappe.db.get_value("Add-on", {"resource_type": resource_type}, "name")
 	if addon:
-		addon_doc = frappe.get_doc("Add-on", addon)
-		rate = frappe.utils.flt(resolve_rate(addon_doc.rates, lock.currency, lock.cluster))
+		rate = frappe.utils.flt(
+			resolve_rate(get_catalog_rates("Add-on", addon), lock.currency, lock.cluster)
+		)
 
 	return {
 		"team": lock.team,

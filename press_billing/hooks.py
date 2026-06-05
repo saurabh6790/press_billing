@@ -189,6 +189,9 @@ scheduler_events = {
 # override_doctype_dashboards = {
 # 	"Task": "press_billing.task.get_dashboard_data"
 # }
+override_doctype_dashboards = {
+	"Currency": "press_billing.dashboard_overrides.currency_dashboard",
+}
 
 # exempt linked doctypes from being automatically cancelled
 #

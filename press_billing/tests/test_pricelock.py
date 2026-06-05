@@ -6,6 +6,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from press_billing.pricelock import get_locked_rate
+from press_billing.pricing import set_catalog_rates
 from press_billing.sync import receive_usage_events
 from press_billing.tests.utils import make_plan
 
@@ -74,12 +75,8 @@ class TestReceiveUsageEvents(PriceLockTestBase):
 
 	def test_locked_rate_survives_live_catalog_change(self):
 		receive_usage_events([event("evt-1", "srv-A", 40)])
-		# Admin raises the live USD rate to 80.
-		plan = frappe.get_doc("Plan", PLAN)
-		for r in plan.rates:
-			if r.currency == "USD":
-				r.rate = 80
-		plan.save(ignore_permissions=True)
+		# Admin raises the live USD rate to 80 (edits the plan's Catalog Rate).
+		set_catalog_rates("Plan", PLAN, [{"cluster": "", "currency": "USD", "rate": 80}])
 
 		self.assertEqual(get_locked_rate("srv-A"), 40)  # the lock is untouched
 

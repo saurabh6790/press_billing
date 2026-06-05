@@ -13,6 +13,7 @@ plan catalog, a GST tax profile, and a Billing workspace to navigate it all.
 import frappe
 
 from press_billing import billing, credits, subscriptions
+from press_billing.pricing import set_catalog_rates
 from press_billing.sync import receive_meter_rollups, receive_usage_events
 
 TEAM = "demo"
@@ -89,17 +90,13 @@ def _meter(qty):
 
 
 def _catalog():
-	_replace(
+	plan = _replace(
 		"Plan",
 		PLAN,
 		{
 			"title": "2 vCPU Bundle",
 			"billing_cycle": "monthly",
 			"is_active": 1,
-			"rates": [
-				{"cluster": "", "currency": "USD", "rate": 40},
-				{"cluster": "", "currency": "INR", "rate": 3200},
-			],
 			"includes": [
 				{"resource_type": "compute", "quantity": 2, "unit": "vCPU"},
 				{"resource_type": "memory", "quantity": 4, "unit": "GB"},
@@ -108,7 +105,15 @@ def _catalog():
 			],
 		},
 	)
-	_replace(
+	set_catalog_rates(
+		"Plan",
+		plan,
+		[
+			{"cluster": "", "currency": "USD", "rate": 40},
+			{"cluster": "", "currency": "INR", "rate": 3200},
+		],
+	)
+	addon = _replace(
 		"Add-on",
 		ADDON,
 		{
@@ -117,9 +122,9 @@ def _catalog():
 			"unit": "GB",
 			"billing_type": "metered",
 			"billing_interval": "monthly",
-			"rates": [{"cluster": "", "currency": "INR", "rate": 0.8}],
 		},
 	)
+	set_catalog_rates("Add-on", addon, [{"cluster": "", "currency": "INR", "rate": 0.8}])
 
 
 def _gateway():

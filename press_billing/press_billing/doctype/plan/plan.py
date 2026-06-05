@@ -3,13 +3,13 @@
 
 from frappe.model.document import Document
 
-from press_billing.pricing import resolve_rate
+from press_billing.pricing import get_catalog_rates, resolve_rate
 
 
 class Plan(Document):
 	def get_rate(self, currency: str, cluster: str | None = None):
 		"""Resolved flat rate for (currency, cluster). The rate IS the price."""
-		return resolve_rate(self.rates, currency, cluster)
+		return resolve_rate(get_catalog_rates("Plan", self.name), currency, cluster)
 
 	def as_pricing(self, currency: str | None = None, cluster: str | None = None) -> dict:
 		"""Catalog snapshot: identity + composition + rates.
@@ -17,6 +17,7 @@ class Plan(Document):
 		With a currency, also resolves the single applicable rate. Consumed by
 		get_plan_pricing and by the push to an Agent's Plan Cache.
 		"""
+		rate_rows = get_catalog_rates("Plan", self.name)
 		data = {
 			"plan": self.name,
 			"title": self.title,
@@ -24,7 +25,7 @@ class Plan(Document):
 			"is_active": self.is_active,
 			"rates": [
 				{"cluster": r.cluster or None, "currency": r.currency, "rate": r.rate}
-				for r in self.rates
+				for r in rate_rows
 			],
 			"includes": [
 				{

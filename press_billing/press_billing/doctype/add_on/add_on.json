@@ -13,9 +13,7 @@
   "unit",
   "column_break_head",
   "billing_type",
-  "billing_interval",
-  "section_break_rates",
-  "rates"
+  "billing_interval"
  ],
  "fields": [
   {
@@ -58,17 +56,6 @@
    "label": "Billing Interval",
    "options": "hourly\ndaily\nmonthly",
    "reqd": 1
-  },
-  {
-   "fieldname": "section_break_rates",
-   "fieldtype": "Section Break",
-   "label": "Rates"
-  },
-  {
-   "fieldname": "rates",
-   "fieldtype": "Table",
-   "label": "Rates",
-   "options": "Add-on Rate"
   }
  ],
  "index_web_pages_for_search": 1,

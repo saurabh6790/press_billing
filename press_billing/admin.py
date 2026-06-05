@@ -311,18 +311,33 @@ def get_retention() -> dict:
 
 @frappe.whitelist()
 def update_plan_rate(plan: str, currency: str, rate, cluster: str = "") -> dict:
-	"""Price management: change a Plan Rate row. Existing price-locks are
+	"""Price management: change a plan's Catalog Rate. Existing price-locks are
 	untouched (they copied the rate at provision) — only new provisions lock the
 	new rate. Zero new plans."""
 	require_billing_admin()
-	doc = frappe.get_doc("Plan", plan)
-	for row in doc.rates:
-		if row.currency == currency and (row.cluster or "") == (cluster or ""):
-			row.rate = rate
-			break
+	if not frappe.db.exists("Plan", plan):
+		frappe.throw(f"Plan {plan!r} does not exist.")
+	cluster = cluster or None
+
+	existing = frappe.get_all(
+		"Catalog Rate",
+		filters={"priced_doctype": "Plan", "priced_for": plan, "currency": currency},
+		fields=["name", "cluster"],
+	)
+	match = next((r for r in existing if (r.cluster or None) == cluster), None)
+	if match:
+		frappe.db.set_value("Catalog Rate", match.name, "rate", rate)
 	else:
-		doc.append("rates", {"currency": currency, "cluster": cluster or None, "rate": rate})
-	doc.save(ignore_permissions=True)
+		frappe.get_doc(
+			{
+				"doctype": "Catalog Rate",
+				"priced_doctype": "Plan",
+				"priced_for": plan,
+				"currency": currency,
+				"cluster": cluster,
+				"rate": rate,
+			}
+		).insert(ignore_permissions=True)
 	return {"plan": plan, "currency": currency, "cluster": cluster or "global", "rate": frappe.utils.flt(rate)}
 
 
@@ -330,12 +345,11 @@ _STANDING_RANK = {"current": 0, "past_due": 1, "suspended": 2}
 
 
 def _plan_monthly_inr(plan: str, cluster: str | None) -> float:
-	from press_billing.pricing import resolve_rate
+	from press_billing.pricing import get_catalog_rates, resolve_rate
 
 	if not plan or not frappe.db.exists("Plan", plan):
 		return 0.0
-	doc = frappe.get_doc("Plan", plan)
-	return frappe.utils.flt(resolve_rate(doc.rates, "INR", cluster))
+	return frappe.utils.flt(resolve_rate(get_catalog_rates("Plan", plan), "INR", cluster))
 
 
 @frappe.whitelist()
