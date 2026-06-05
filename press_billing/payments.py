@@ -87,66 +87,67 @@ def confirm_payment_method(
 	method.status = "active"
 	method.validated_at = frappe.utils.now_datetime()
 	method.save(ignore_permissions=True)
-	_ensure_one_default(method)
+	densify_priorities(method.team)
+	method.reload()  # pick up priority / is_default set by densify
 	return method
 
 
-def _ensure_one_default(method):
-	"""A team's first active method becomes its default — never zero, never two."""
-	other_default = frappe.get_all(
+def densify_priorities(team: str):
+	"""Renumber a team's methods into dense `priority` (0,1,2,…) by current order
+	and mirror `is_default` = (priority == 0). The single place that defines the
+	fallback order; idempotent."""
+	names = frappe.get_all(
 		"Payment Method",
-		filters={
-			"team": method.team,
-			"is_default": 1,
-			"status": "active",
-			"name": ["!=", method.name],
-		},
-		limit=1,
+		filters={"team": team, "status": ["!=", "cancelled"]},
+		order_by="priority asc, creation asc",
+		pluck="name",
 	)
-	if not other_default and not method.is_default:
-		frappe.db.set_value("Payment Method", method.name, "is_default", 1)
-		method.is_default = 1
+	for i, name in enumerate(names):
+		frappe.db.set_value(
+			"Payment Method",
+			name,
+			{"priority": i, "is_default": 1 if i == 0 else 0},
+			update_modified=False,
+		)
 
 
 @frappe.whitelist()
 def set_default_payment_method(payment_method: str):
-	"""Make this the team's sole default. Only an active method can be default."""
+	"""Make this the team's primary (priority 0). Only an active method can be."""
 	method = frappe.get_doc("Payment Method", payment_method)
 	if method.status != "active":
-		frappe.throw("Only an active payment method can be the default.", frappe.ValidationError)
-
-	for name in frappe.get_all(
-		"Payment Method",
-		filters={"team": method.team, "is_default": 1, "name": ["!=", method.name]},
-		pluck="name",
-	):
-		frappe.db.set_value("Payment Method", name, "is_default", 0)
-	frappe.db.set_value("Payment Method", method.name, "is_default", 1)
+		frappe.throw("Only an active payment method can be the primary.", frappe.ValidationError)
+	# Sort it ahead of everyone, then re-densify resolves the rest.
+	frappe.db.set_value("Payment Method", method.name, "priority", -1, update_modified=False)
+	densify_priorities(method.team)
 	return frappe.get_doc("Payment Method", method.name)
 
 
 @frappe.whitelist()
-def delete_payment_method(payment_method: str) -> dict:
-	"""Remove a payment method. If it was the team's default, promote the next
-	active method so the team keeps exactly one default (or none if it was the
-	last)."""
-	method = frappe.get_doc("Payment Method", payment_method)
-	team, was_default = method.team, method.is_default
-	frappe.delete_doc("Payment Method", method.name, ignore_permissions=True)
+def reorder_payment_methods(team: str, ordered) -> dict:
+	"""Set the fallback order from a top-first list of method names."""
+	if isinstance(ordered, str):
+		ordered = frappe.parse_json(ordered)
+	for i, name in enumerate(ordered):
+		if frappe.db.get_value("Payment Method", name, "team") != team:
+			frappe.throw("Method does not belong to this team.", frappe.ValidationError)
+		frappe.db.set_value("Payment Method", name, "priority", i, update_modified=False)
+	densify_priorities(team)
+	return {"team": team, "ordered": ordered}
 
-	promoted = None
-	if was_default:
-		candidates = frappe.get_all(
-			"Payment Method",
-			filters={"team": team, "status": "active"},
-			order_by="creation asc",
-			limit=1,
-			pluck="name",
-		)
-		if candidates:
-			promoted = candidates[0]
-			frappe.db.set_value("Payment Method", promoted, "is_default", 1)
-	return {"deleted": payment_method, "new_default": promoted}
+
+@frappe.whitelist()
+def delete_payment_method(payment_method: str) -> dict:
+	"""Remove a payment method and re-densify so the team keeps a dense, primary-
+	first order (or none if it was the last)."""
+	method = frappe.get_doc("Payment Method", payment_method)
+	team = method.team
+	frappe.delete_doc("Payment Method", method.name, ignore_permissions=True)
+	densify_priorities(team)
+	new_default = frappe.db.get_value(
+		"Payment Method", {"team": team, "priority": 0, "status": "active"}, "name"
+	)
+	return {"deleted": payment_method, "new_default": new_default}
 
 
 def expire_payment_methods(now=None) -> dict:

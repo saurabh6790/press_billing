@@ -136,7 +136,12 @@ def apply_webhook(event_name: str) -> dict:
 
 	attempt = frappe.get_doc("Payment Attempt", attempt_name)
 	if is_failure:
-		if attempt.status not in ("captured", "refunded"):
+		fell_back = None
+		# A failure matters only until the invoice is settled — never undo a Paid
+		# invoice (a sync `captured` attempt isn't final: Paid lands on the success
+		# webhook). Gate on invoice status, not attempt status, and act once.
+		inv_status = frappe.db.get_value("Invoice", attempt.invoice, "status")
+		if inv_status != "Paid" and attempt.status not in ("failed", "refunded"):
 			attempt.status = "failed"
 			attempt.completed_at = frappe.utils.now_datetime()
 			attempt.save(ignore_permissions=True)
@@ -147,8 +152,14 @@ def apply_webhook(event_name: str) -> dict:
 				context={"invoice": attempt.invoice, "reason": attempt.failure_reason or "declined"},
 				reference_doctype="Invoice", reference_name=attempt.invoice,
 			)
+			# Async decline: rotate to the next untried method (#28). No-op once
+			# every method has been exhausted.
+			if inv_status in ("Open", "Overdue"):
+				from press_billing import collection
+
+				fell_back = collection.collect_invoice(attempt.invoice)
 		_mark_event(event, "processed")
-		return {"handled": True, "result": "failed", "attempt": attempt_name}
+		return {"handled": True, "result": "failed", "attempt": attempt_name, "fell_back": fell_back}
 
 	settled = _settle_invoice(attempt)
 	attempt.status = "captured"

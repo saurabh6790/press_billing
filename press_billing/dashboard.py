@@ -214,9 +214,9 @@ def list_payment_methods(team: str | None = None) -> list[dict]:
 	return frappe.get_all(
 		"Payment Method",
 		filters={"team": team, "status": ["!=", "cancelled"]},
-		fields=["name", "method_type", "status", "display_label", "is_default",
-				"expiry_month", "expiry_year"],
-		order_by="is_default desc, creation desc",
+		fields=["name", "method_type", "status", "display_label", "is_default", "priority",
+				"reauth_required", "expiry_month", "expiry_year"],
+		order_by="priority asc, creation asc",
 	)
 
 
@@ -305,13 +305,15 @@ def add_demo_card(team=None, gateway=None, display_label="Visa ····4242",
 	"""Demo convenience: register an active card without a live gateway round-trip.
 	(Production uses initiate_card_setup + confirm_card with the gateway SDK.)"""
 	team = _resolve_team(team)
+	from press_billing import payments
+
 	name = frappe.get_doc({
 		"doctype": "Payment Method", "team": team, "gateway": gateway, "method_type": "card",
 		"status": "active", "display_label": display_label, "gateway_method_id": f"pm_{frappe.generate_hash(6)}",
 		"gateway_customer_id": f"cus_{team}", "expiry_month": expiry_month, "expiry_year": expiry_year,
-		"is_default": not frappe.db.exists("Payment Method", {"team": team, "is_default": 1}),
 		"validated_at": frappe.utils.now_datetime(),
 	}).insert(ignore_permissions=True).name
+	payments.densify_priorities(team)  # append at the end of the fallback order
 	return {"payment_method": name, "status": "active"}
 
 
@@ -579,4 +581,13 @@ def set_default_payment_method(payment_method=None) -> dict:
 	from press_billing import payments
 
 	doc = payments.set_default_payment_method(payment_method)
-	return {"payment_method": doc.name, "is_default": doc.is_default}
+	return {"payment_method": doc.name, "is_default": doc.is_default, "priority": doc.priority}
+
+
+@frappe.whitelist()
+def reorder_payment_methods(team=None, ordered=None) -> dict:
+	"""Set the team's fallback order (primary→backups) from a top-first list."""
+	team = _resolve_team(team)
+	from press_billing import payments
+
+	return payments.reorder_payment_methods(team, ordered)

@@ -8,3 +8,4 @@ press_billing.patches.v01_rates_to_standalone.snapshot_legacy_rate_children
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 press_billing.patches.v01_rates_to_standalone.migrate_rate_children_to_standalone
+press_billing.patches.v02_payment_method_priority.backfill_priority

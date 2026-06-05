@@ -334,14 +334,13 @@ def open_and_collect(invoice: str, collect: bool = True) -> dict:
 	doc.status = "Open"
 	doc.save(ignore_permissions=True)
 
-	# Leg 2 — charge the remainder to the card, when the team has one wired.
+	# Leg 2 — charge the remainder, walking the team's methods primary→backup
+	# (#28). Credits-only teams (no active method) fall through to dunning.
 	charge = None
-	if collect and doc.subscription:
-		sub = frappe.get_doc("Subscription", doc.subscription)
-		if sub.default_payment_method and sub.gateway:
-			from press_billing import charges
+	if collect:
+		from press_billing import collection
 
-			charge = charges.pay_invoice(invoice)
+		charge = collection.collect_invoice(invoice)
 
 	return {"invoice": invoice, "claimed": True, "credit_applied": applied,
 			"expected_collection": doc.expected_collection, "status": "Open", "charge": charge}

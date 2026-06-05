@@ -20,7 +20,7 @@ _state on the Agent).
 
 import frappe
 
-from press_billing import charges, subscriptions
+from press_billing import subscriptions
 from press_billing.entitlements import issue_token
 
 RETRY_DAYS = [1, 3, 7]
@@ -32,17 +32,17 @@ def _notify(invoice, message: str):
 	invoice.add_comment("Info", message)
 
 
-def _has_card(sub) -> bool:
-	return bool(sub and sub.default_payment_method and sub.gateway)
-
-
 def retry_payment(invoice_name: str) -> dict:
-	"""One dunning retry: a fresh Payment Attempt, notified with the reason."""
-	from press_billing import notifications
+	"""One dunning retry: charge the next untried method (primary→backup, #28),
+	notified with the reason on failure."""
+	from press_billing import collection, notifications
 
-	result = charges.pay_invoice(invoice_name)
-	if result.get("attempt"):
-		attempt = frappe.get_doc("Payment Attempt", result["attempt"])
+	result = collection.collect_invoice(invoice_name)
+	last = frappe.get_all(
+		"Payment Attempt", {"invoice": invoice_name}, order_by="creation desc", limit=1, pluck="name"
+	)
+	if last:
+		attempt = frappe.get_doc("Payment Attempt", last[0])
 		if attempt.status == "failed":
 			n = frappe.db.count("Payment Attempt", {"invoice": invoice_name})
 			reason = attempt.failure_reason or attempt.failure_code or "declined"
@@ -96,16 +96,17 @@ def process_invoice_dunning(invoice_name: str, now=None) -> dict:
 	sub = frappe.get_doc("Subscription", inv.subscription) if inv.subscription else None
 	actions = []
 
-	# --- retries (card teams only; credits-only shortfalls just escalate) ----
-	if _has_card(sub):
-		failed = frappe.db.count("Payment Attempt", {"invoice": invoice_name, "status": "failed"})
-		retries_due = sum(1 for d in RETRY_DAYS if days >= d)
-		if failed < retries_due and inv.status == "Open":
-			retry_payment(invoice_name)
-			actions.append("retry")
-			inv.reload()
-			if inv.status == "Paid":
-				return {"invoice": invoice_name, "days_overdue": days, "action": "paid"}
+	# --- retries: try the next untried method, if any (escalate, don't repeat,
+	# #28). Once every method has failed there is nothing left to charge, so the
+	# stages below escalate. Credits-only teams (no methods) skip straight there.
+	from press_billing import collection
+
+	if inv.status == "Open" and collection.next_method_for(invoice_name, inv.team):
+		retry_payment(invoice_name)
+		actions.append("retry")
+		inv.reload()
+		if inv.status == "Paid":
+			return {"invoice": invoice_name, "days_overdue": days, "action": "paid"}
 
 	standing = sub.account_standing if sub else None
 

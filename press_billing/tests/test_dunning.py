@@ -101,24 +101,42 @@ class DunningTestBase(IntegrationTestCase):
 
 
 class TestRetrySchedule(DunningTestBase):
-	def test_retries_on_day_1_3_7_each_a_new_attempt_with_notice(self):
+	def test_failed_method_is_not_retried_on_later_days(self):
+		"""Escalate, don't repeat (#28): a method that failed once is never retried.
+		With a single card the Day 1 attempt is the only charge; Day 3/7 escalate."""
 		sub = self._subscription()
 		inv = self._open_invoice(sub)
 		with declining_gateway():
 			dunning.process_invoice_dunning(inv, now=day(1))
 			self.assertEqual(self._attempts(inv), 1)
 			dunning.process_invoice_dunning(inv, now=day(3))
-			self.assertEqual(self._attempts(inv), 2)
+			self.assertEqual(self._attempts(inv), 1)  # not repeated
 			dunning.process_invoice_dunning(inv, now=day(7))
-			self.assertEqual(self._attempts(inv), 3)
+			self.assertEqual(self._attempts(inv), 1)
 
-		# A notification per retry, carrying the failure reason.
 		notes = frappe.get_all(
 			"Comment",
 			{"reference_doctype": "Invoice", "reference_name": inv, "comment_type": "Info"},
 			pluck="content",
 		)
-		self.assertEqual(sum("retry" in n for n in notes), 3)
+		self.assertEqual(sum("retry" in n for n in notes), 1)
+
+	def test_backup_method_is_tried_once(self):
+		"""A backup is charged after the primary fails, then neither is retried."""
+		sub = self._subscription()  # primary card pm_x (priority 0)
+		frappe.get_doc(
+			{
+				"doctype": "Payment Method", "team": TEAM, "gateway": GATEWAY,
+				"method_type": "card", "status": "active", "gateway_method_id": "pm_y",
+				"gateway_customer_id": "cus_x", "priority": 1,
+			}
+		).insert(ignore_permissions=True)
+		inv = self._open_invoice(sub)
+		with declining_gateway():
+			dunning.process_invoice_dunning(inv, now=day(1))
+			self.assertEqual(self._attempts(inv), 2)  # primary then backup, one each
+			dunning.process_invoice_dunning(inv, now=day(3))
+			self.assertEqual(self._attempts(inv), 2)  # both exhausted, no repeat
 
 	def test_same_day_rerun_does_not_double_retry(self):
 		sub = self._subscription()
