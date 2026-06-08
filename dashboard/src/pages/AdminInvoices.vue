@@ -47,7 +47,7 @@ import { Badge, FormControl, createResource } from 'frappe-ui';
 import { money, statusTheme } from '../utils';
 
 const route = useRoute();
-const invoices = createResource({ url: 'press_billing.admin.list_all_invoices', auto: true });
+const invoices = createResource({ url: 'billing.admin.list_all_invoices', auto: true });
 const fStatus = ref('all');
 const fSearch = ref('');
 

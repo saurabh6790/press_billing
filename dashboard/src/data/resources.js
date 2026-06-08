@@ -4,17 +4,17 @@ import { createResource } from 'frappe-ui';
 // team-scoping (require_team_access) — the client never passes a team it
 // shouldn't see.
 export function forecastResource() {
-  return createResource({ url: 'press_billing.dashboard.get_forecast', auto: true });
+  return createResource({ url: 'billing.dashboard.get_forecast', auto: true });
 }
 
 export function invoicesResource() {
-  return createResource({ url: 'press_billing.dashboard.list_invoices', auto: true });
+  return createResource({ url: 'billing.dashboard.list_invoices', auto: true });
 }
 
 export function paymentMethodsResource() {
-  return createResource({ url: 'press_billing.dashboard.list_payment_methods', auto: true });
+  return createResource({ url: 'billing.dashboard.list_payment_methods', auto: true });
 }
 
 export function creditLedgerResource() {
-  return createResource({ url: 'press_billing.dashboard.credit_ledger', auto: true });
+  return createResource({ url: 'billing.dashboard.credit_ledger', auto: true });
 }

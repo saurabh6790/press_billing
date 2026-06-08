@@ -71,8 +71,8 @@
 import { ref } from 'vue';
 import { Badge, createResource } from 'frappe-ui';
 import { money } from '../utils';
-const d = createResource({ url: 'press_billing.admin.get_trial_detail', auto: true });
-const conv = createResource({ url: 'press_billing.admin.get_conversion', auto: true });
+const d = createResource({ url: 'billing.admin.get_trial_detail', auto: true });
+const conv = createResource({ url: 'billing.admin.get_conversion', auto: true });
 const expanded = ref(null);
 function toggle(team) { expanded.value = expanded.value === team ? null : team; }
 </script>

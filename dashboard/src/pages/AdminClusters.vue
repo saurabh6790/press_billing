@@ -10,5 +10,5 @@
 <script setup>
 import { createResource } from 'frappe-ui';
 import Panel from '../components/Panel.vue';
-const cluster = createResource({ url: 'press_billing.admin.get_cluster_consumption', auto: true });
+const cluster = createResource({ url: 'billing.admin.get_cluster_consumption', auto: true });
 </script>

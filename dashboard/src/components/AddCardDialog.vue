@@ -76,7 +76,7 @@ let stripe = null; let elements = null; let cardElement = null;
 let cardBrand = 'card';
 
 const options = createResource({
-  url: 'press_billing.dashboard.get_payment_method_options',
+  url: 'billing.dashboard.get_payment_method_options',
   makeParams: () => ({ team: props.team }),
   onSuccess: (d) => { method.value = d.allow_upi ? 'upi_autopay' : 'card'; },
 });
@@ -120,11 +120,11 @@ function teardownStripe() {
   elements = null; stripe = null; cardBrand = 'card';
 }
 
-const saveProfile = createResource({ url: 'press_billing.dashboard.save_billing_profile' });
-const setup = createResource({ url: 'press_billing.dashboard.setup_payment_method_order' });
-const confirm = createResource({ url: 'press_billing.dashboard.confirm_payment_method_order' });
-const initStripe = createResource({ url: 'press_billing.dashboard.initiate_card_setup' });
-const confirmStripe = createResource({ url: 'press_billing.dashboard.confirm_card' });
+const saveProfile = createResource({ url: 'billing.dashboard.save_billing_profile' });
+const setup = createResource({ url: 'billing.dashboard.setup_payment_method_order' });
+const confirm = createResource({ url: 'billing.dashboard.confirm_payment_method_order' });
+const initStripe = createResource({ url: 'billing.dashboard.initiate_card_setup' });
+const confirmStripe = createResource({ url: 'billing.dashboard.confirm_card' });
 
 async function submit() {
   error.value = ''; loading.value = true;

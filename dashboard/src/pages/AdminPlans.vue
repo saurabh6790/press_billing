@@ -10,5 +10,5 @@
 <script setup>
 import { createResource } from 'frappe-ui';
 import Panel from '../components/Panel.vue';
-const plan = createResource({ url: 'press_billing.admin.get_plan_consumption', auto: true });
+const plan = createResource({ url: 'billing.admin.get_plan_consumption', auto: true });
 </script>

@@ -1,4 +1,4 @@
-### Press Billing
+### Billing
 
 Billing & payments system of record for Frappe Cloud v2
 
@@ -9,7 +9,7 @@ You can install this app using the [bench](https://github.com/frappe/bench) CLI:
 ```bash
 cd $PATH_TO_YOUR_BENCH
 bench get-app $URL_OF_THIS_REPO --branch fc-prod
-bench install-app press_billing
+bench install-app billing
 ```
 
 ### Contributing
@@ -17,7 +17,7 @@ bench install-app press_billing
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
 
 ```bash
-cd apps/press_billing
+cd apps/billing
 pre-commit install
 ```
 

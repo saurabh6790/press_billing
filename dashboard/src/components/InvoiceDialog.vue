@@ -55,6 +55,6 @@ import { money, statusTheme, invoiceTypeLabel } from '../utils';
 const props = defineProps({ modelValue: Boolean, name: String });
 const emit = defineEmits(['update:modelValue']);
 const show = computed({ get: () => props.modelValue, set: (v) => emit('update:modelValue', v) });
-const inv = createResource({ url: 'press_billing.dashboard.get_invoice' });
+const inv = createResource({ url: 'billing.dashboard.get_invoice' });
 watch(() => props.name, (n) => { if (n) inv.submit({ name: n }); });
 </script>

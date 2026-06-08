@@ -44,7 +44,7 @@ jspm_packages/
 lib64/
 node_modules/
 parts/
-press_billing/public/dashboard/
+billing/public/dashboard/
 sdist/
 tags
 var/

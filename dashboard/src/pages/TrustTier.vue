@@ -80,7 +80,7 @@ import { Badge, createResource } from 'frappe-ui';
 import { store } from '../store';
 import { money } from '../utils';
 
-const t = createResource({ url: 'press_billing.dashboard.get_trust_tier', makeParams: () => ({ team: store.team }) });
+const t = createResource({ url: 'billing.dashboard.get_trust_tier', makeParams: () => ({ team: store.team }) });
 watch(() => store.team, (v) => v && t.reload(), { immediate: true });
 const cur = computed(() => t.data?.currency || 'INR');
 

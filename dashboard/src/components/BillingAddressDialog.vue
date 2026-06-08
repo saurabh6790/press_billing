@@ -19,7 +19,7 @@ const show = computed({ get: () => props.modelValue, set: (v) => emit('update:mo
 const form = reactive({ legal_name: '', gstin: '', email: '', phone: '', address_line1: '', city: '', state: '', pincode: '' });
 watch(() => props.profile, (p) => p && Object.assign(form, p), { immediate: true });
 const error = ref(''); const loading = ref(false);
-const res = createResource({ url: 'press_billing.dashboard.save_billing_profile' });
+const res = createResource({ url: 'billing.dashboard.save_billing_profile' });
 async function save() {
   error.value = ''; loading.value = true;
   try { await res.submit({ team: props.team, ...form }); emit('success'); show.value = false; }

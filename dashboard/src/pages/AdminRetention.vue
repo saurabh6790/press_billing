@@ -65,7 +65,7 @@
 import { createResource } from 'frappe-ui';
 import { Badge } from 'frappe-ui';
 import { titleCase, standingTheme } from '../utils';
-const r = createResource({ url: 'press_billing.admin.get_retention', auto: true });
+const r = createResource({ url: 'billing.admin.get_retention', auto: true });
 function pct(k) {
   const t = r.data?.total_teams || 0;
   return t ? `${((r.data[k] || 0) / t) * 100}%` : '0%';

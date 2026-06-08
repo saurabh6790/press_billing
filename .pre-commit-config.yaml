@@ -8,7 +8,7 @@ repos:
     rev: v4.3.0
     hooks:
       - id: trailing-whitespace
-        files: "press_billing.*"
+        files: "billing.*"
         exclude: ".*json$|.*txt$|.*csv|.*md|.*svg"
       - id: check-yaml
       - id: check-merge-conflict
@@ -36,11 +36,11 @@ repos:
         # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
-                press_billing/public/dist/.*|
+                billing/public/dist/.*|
                 .*node_modules.*|
                 .*boilerplate.*|
-                press_billing/templates/includes/.*|
-                press_billing/public/js/lib/.*
+                billing/templates/includes/.*|
+                billing/public/js/lib/.*
             )$
 
 
@@ -53,12 +53,12 @@ repos:
         # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
-                press_billing/public/dist/.*|
+                billing/public/dist/.*|
                 cypress/.*|
                 .*node_modules.*|
                 .*boilerplate.*|
-                press_billing/templates/includes/.*|
-                press_billing/public/js/lib/.*
+                billing/templates/includes/.*|
+                billing/public/js/lib/.*
             )$
 
 ci:

@@ -34,9 +34,9 @@ const quick = [1000, 2000, 5000, 10000];
 const amount = ref(5000);
 const form = reactive({ legal_name: '', gstin: '', email: '', phone: '', address_line1: '', city: '', state: '', pincode: '' });
 const error = ref(''); const loading = ref(false);
-const saveProfile = createResource({ url: 'press_billing.dashboard.save_billing_profile' });
-const createOrder = createResource({ url: 'press_billing.dashboard.create_topup_order' });
-const confirm = createResource({ url: 'press_billing.dashboard.confirm_topup' });
+const saveProfile = createResource({ url: 'billing.dashboard.save_billing_profile' });
+const createOrder = createResource({ url: 'billing.dashboard.create_topup_order' });
+const confirm = createResource({ url: 'billing.dashboard.confirm_topup' });
 async function submit() {
   error.value = ''; loading.value = true;
   try {

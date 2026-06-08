@@ -7,9 +7,9 @@ colour tokens (press parity — no bespoke palette).
 
 ## Build
 
-    cd apps/press_billing/dashboard
+    cd apps/billing/dashboard
     yarn install
-    yarn build        # -> ../press_billing/public/dashboard/ (served at /assets/press_billing/dashboard/)
+    yarn build        # -> ../billing/public/dashboard/ (served at /assets/billing/dashboard/)
 
 Then open **/billing** on the site (served by `www/billing.html`; deep links
 under `/billing/*` resolve via the website route rule). For live development:

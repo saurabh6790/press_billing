@@ -5,10 +5,10 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [frappeui({ frappeProxy: true, lucideIcons: true, jinjaBootData: false, buildConfig: false }), vue()],
-  base: '/assets/press_billing/dashboard/',
+  base: '/assets/billing/dashboard/',
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   build: {
-    outDir: path.resolve(__dirname, '../press_billing/public/dashboard'),
+    outDir: path.resolve(__dirname, '../billing/public/dashboard'),
     emptyOutDir: true,
     sourcemap: false,
     // Content-hashed filenames -> browsers always fetch the right version.

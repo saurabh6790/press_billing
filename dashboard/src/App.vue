@@ -51,8 +51,8 @@ import LucideGift from '~icons/lucide/gift';
 import LucideUserCheck from '~icons/lucide/user-check';
 import { store } from './store';
 const router = useRouter();
-createResource({ url: 'press_billing.dashboard.whoami', auto: true, onSuccess: (d) => { store.team = d.team; store.isAdmin = d.is_billing_admin; } });
-const teams = createResource({ url: 'press_billing.dashboard.list_switchable_teams', auto: true });
+createResource({ url: 'billing.dashboard.whoami', auto: true, onSuccess: (d) => { store.team = d.team; store.isAdmin = d.is_billing_admin; } });
+const teams = createResource({ url: 'billing.dashboard.list_switchable_teams', auto: true });
 const teamOptions = computed(() => (teams.data || []).map((t) => ({ label: `${t.team} (${t.tier || '—'})`, value: t.team })));
 function switchTeam(t) { store.team = t; }
 function setView(v) { store.view = v; router.push(v === 'admin' ? '/billing/admin' : '/billing'); }
