@@ -7,8 +7,10 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import credits, dashboard, security
-from billing.sync import receive_usage_events
+from billing.revenue import credits
+from billing.api import dashboard
+from billing.platform import security
+from billing.platform.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
 TEAM = "team-cust"
@@ -124,8 +126,8 @@ class TestTeamScoping(CustomerDataBase):
 		).insert(ignore_permissions=True)
 		frappe.set_user(user)
 		try:
-			with patch("billing.dashboard.get_user_team", return_value=TEAM), patch(
-				"billing.security.get_user_team", return_value=TEAM
+			with patch("billing.api.dashboard._shared.get_user_team", return_value=TEAM), patch(
+				"billing.platform.security.get_user_team", return_value=TEAM
 			):
 				dashboard.list_invoices()  # own team — ok
 				with self.assertRaises(frappe.PermissionError):
@@ -162,7 +164,7 @@ class TestCustomerActions(CustomerDataBase):
 		self.assertEqual(s["min_balance"], 5000)
 
 	def test_admin_without_team_falls_back(self):
-		from billing import subscriptions
+		from billing.catalog import subscriptions
 		subscriptions.create_subscription(team=TEAM, cluster=CLUSTER, plan=PLAN, billing_cycle="monthly")
 		invoices = dashboard.list_invoices()  # no team arg, as admin
 		self.assertIsInstance(invoices, list)

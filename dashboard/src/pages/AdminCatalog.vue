@@ -73,5 +73,5 @@
 <script setup>
 import { Badge, createResource } from 'frappe-ui';
 import { money } from '../utils';
-const cat = createResource({ url: 'billing.admin.get_catalog', auto: true });
+const cat = createResource({ url: 'billing.api.admin.get_catalog', auto: true });
 </script>

@@ -56,9 +56,9 @@ import LucideUsers from '~icons/lucide/users';
 import LucideTriangleAlert from '~icons/lucide/triangle-alert';
 import LucideCreditCard from '~icons/lucide/credit-card';
 
-const m = createResource({ url: 'billing.admin.get_metrics', auto: true });
-const sum = createResource({ url: 'billing.admin.get_summary', auto: true });
-const trend = createResource({ url: 'billing.admin.get_revenue_trend', auto: true });
+const m = createResource({ url: 'billing.api.admin.get_metrics', auto: true });
+const sum = createResource({ url: 'billing.api.admin.get_summary', auto: true });
+const trend = createResource({ url: 'billing.api.admin.get_revenue_trend', auto: true });
 
 const stats = computed(() => [
   { label: 'MRR', value: money(m.data?.mrr), sub: `${m.data?.active_subscriptions ?? 0} active subscriptions`, icon: LucideTrendingUp, to: '/billing/admin/teams' },

@@ -10,7 +10,8 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import charges, subscriptions, webhooks
+from billing.payments import charges, webhooks
+from billing.catalog import subscriptions
 from billing.gateways.base import PaymentResult
 from billing.tests.test_stripe_adapter import make_stripe_gateway
 from billing.tests.utils import make_plan

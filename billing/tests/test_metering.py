@@ -5,8 +5,9 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import invoicing, metering, subscriptions
-from billing.sync import receive_meter_rollups, receive_usage_events
+from billing.revenue import invoicing, metering
+from billing.catalog import subscriptions
+from billing.platform.sync import receive_meter_rollups, receive_usage_events
 from billing.tests.utils import make_addon, make_plan
 
 TEAM = "team-meter"

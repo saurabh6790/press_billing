@@ -5,8 +5,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import subscriptions
-from billing.subscriptions import InvalidTransition
+from billing.catalog import subscriptions
+from billing.catalog.subscriptions import InvalidTransition
 from billing.tests.utils import make_plan
 
 PLAN = "bundle-sub-test"
@@ -124,7 +124,7 @@ class TestReconciliation(SubscriptionTestBase):
 		self.assertEqual(result["reason"], "no_cluster_event")
 
 	def test_reconcile_matches_locked_plan(self):
-		from billing.sync import receive_usage_events
+		from billing.platform.sync import receive_usage_events
 
 		sub = self.make_sub()
 		# Agent reports the resource for this plan → Central locks it.

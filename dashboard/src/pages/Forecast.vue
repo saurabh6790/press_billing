@@ -50,7 +50,7 @@ import { computed, watch } from 'vue';
 import { Badge, createResource } from 'frappe-ui';
 import { store } from '../store';
 import { money } from '../utils';
-const fc = createResource({ url: 'billing.dashboard.get_forecast', makeParams: () => ({ team: store.team }) });
+const fc = createResource({ url: 'billing.api.dashboard.get_forecast', makeParams: () => ({ team: store.team }) });
 const cur = computed(() => fc.data?.currency || 'INR');
 watch(() => store.team, (t) => t && fc.reload(), { immediate: true });
 </script>

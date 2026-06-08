@@ -7,8 +7,8 @@ import threading
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import credits
-from billing.credits import InsufficientCredits
+from billing.revenue import credits
+from billing.revenue.credits import InsufficientCredits
 
 TEAM = "team-wallet"
 

@@ -37,7 +37,7 @@ import { money, standingTheme, statusTheme, titleCase, attemptTheme, attemptLabe
 const props = defineProps({ modelValue: Boolean, data: Object });
 const emit = defineEmits(['update:modelValue']);
 const show = computed({ get: () => props.modelValue, set: (v) => emit('update:modelValue', v) });
-const d = createResource({ url: 'billing.admin.get_team_billing' });
+const d = createResource({ url: 'billing.api.admin.get_team_billing' });
 watch(() => props.data, (t) => { if (t?.team) d.submit({ team: t.team }); });
 const sections = [
   { title: 'Subscriptions', key: 'subscriptions', cols: ['Plan', 'Cluster', 'Status'], fields: ['plan', 'cluster', 'account_standing'] },

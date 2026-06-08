@@ -156,7 +156,7 @@ def expire_payment_methods(now=None) -> dict:
 	A card is valid through the end of its printed expiry month; the day after,
 	it is no longer chargeable.
 	"""
-	from billing import notifications
+	from billing.platform import notifications
 
 	today = frappe.utils.getdate(now or frappe.utils.now_datetime())
 	expired = []

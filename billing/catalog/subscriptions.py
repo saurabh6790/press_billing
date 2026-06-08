@@ -149,7 +149,7 @@ def reconcile_with_agent_event(subscription: str, resource_id: str) -> dict:
 	plan actually locked: a missing lock means the cluster has not yet reported
 	(intent outstanding); a plan mismatch is surfaced for follow-up.
 	"""
-	from billing.pricelock import _open_lock
+	from billing.revenue.pricelock import _open_lock
 
 	doc = frappe.get_doc("Subscription", subscription)
 	lock_name = _open_lock(resource_id)

@@ -23,7 +23,7 @@ BACKOFF_BASE_SECONDS = 60  # 60s, 120s, 240s
 def enqueue_invoice_sync(invoice: str):
 	"""Post-payment hook: queue the ERPNext sync after the transaction commits."""
 	frappe.enqueue(
-		"billing.erpnext_sync.sync_invoice",
+		"billing.revenue.erpnext_sync.sync_invoice",
 		invoice=invoice,
 		enqueue_after_commit=True,
 		queue="long",

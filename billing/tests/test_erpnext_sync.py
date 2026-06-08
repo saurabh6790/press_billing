@@ -8,7 +8,7 @@ import frappe
 import requests
 from frappe.tests import IntegrationTestCase
 
-from billing import erpnext_sync
+from billing.revenue import erpnext_sync
 
 TEAM = "team-erp"
 
@@ -55,7 +55,7 @@ class ErpnextSyncTestBase(IntegrationTestCase):
 class TestSyncSuccess(ErpnextSyncTestBase):
 	def test_paid_invoice_syncs_and_stores_reference(self):
 		inv = self._paid_invoice()
-		with patch("billing.erpnext_sync.requests.post", return_value=ok_response("SINV-9")) as post:
+		with patch("billing.revenue.erpnext_sync.requests.post", return_value=ok_response("SINV-9")) as post:
 			out = erpnext_sync.sync_invoice(inv)
 
 		self.assertEqual(out["synced"], "SINV-9")
@@ -71,7 +71,7 @@ class TestSyncSuccess(ErpnextSyncTestBase):
 	def test_already_synced_is_idempotent(self):
 		inv = self._paid_invoice()
 		frappe.db.set_value("Invoice", inv, {"erpnext_invoice": "SINV-1", "erpnext_sync_status": "synced"})
-		with patch("billing.erpnext_sync.requests.post") as post:
+		with patch("billing.revenue.erpnext_sync.requests.post") as post:
 			out = erpnext_sync.sync_invoice(inv)
 			post.assert_not_called()
 		self.assertEqual(out["skipped"], "already_synced")
@@ -79,7 +79,7 @@ class TestSyncSuccess(ErpnextSyncTestBase):
 	def test_cost_report_and_unpaid_are_skipped(self):
 		cost = self._paid_invoice(invoice_type="cost_report")
 		draft = self._paid_invoice(status="Open")
-		with patch("billing.erpnext_sync.requests.post") as post:
+		with patch("billing.revenue.erpnext_sync.requests.post") as post:
 			self.assertEqual(erpnext_sync.sync_invoice(cost)["skipped"], "not_billable")
 			self.assertEqual(erpnext_sync.sync_invoice(draft)["skipped"], "not_paid")
 			post.assert_not_called()
@@ -88,7 +88,7 @@ class TestSyncSuccess(ErpnextSyncTestBase):
 class TestFailureIsolation(ErpnextSyncTestBase):
 	def test_erpnext_500_does_not_touch_the_customer_invoice(self):
 		inv = self._paid_invoice()
-		with patch("billing.erpnext_sync.requests.post", return_value=err_response()):
+		with patch("billing.revenue.erpnext_sync.requests.post", return_value=err_response()):
 			out = erpnext_sync.sync_invoice(inv)
 
 		self.assertTrue(out["retry_scheduled"])
@@ -101,7 +101,7 @@ class TestFailureIsolation(ErpnextSyncTestBase):
 
 	def test_backoff_grows_then_alerts_ops_after_three_attempts(self):
 		inv = self._paid_invoice()
-		with patch("billing.erpnext_sync.requests.post", return_value=err_response()):
+		with patch("billing.revenue.erpnext_sync.requests.post", return_value=err_response()):
 			a1 = erpnext_sync.sync_invoice(inv)
 			a2 = erpnext_sync.sync_invoice(inv)
 			a3 = erpnext_sync.sync_invoice(inv)
@@ -122,11 +122,11 @@ class TestFailureIsolation(ErpnextSyncTestBase):
 
 	def test_retry_scheduler_picks_up_due_pending_and_succeeds(self):
 		inv = self._paid_invoice()
-		with patch("billing.erpnext_sync.requests.post", return_value=err_response()):
+		with patch("billing.revenue.erpnext_sync.requests.post", return_value=err_response()):
 			erpnext_sync.sync_invoice(inv)  # → pending, next_retry_at in ~60s
 
 		future = frappe.utils.add_to_date(frappe.utils.now_datetime(), seconds=120)
-		with patch("billing.erpnext_sync.requests.post", return_value=ok_response("SINV-RETRY")):
+		with patch("billing.revenue.erpnext_sync.requests.post", return_value=ok_response("SINV-RETRY")):
 			erpnext_sync.retry_failed_syncs(now=future)
 
 		doc = frappe.get_doc("Invoice", inv)
@@ -137,7 +137,7 @@ class TestFailureIsolation(ErpnextSyncTestBase):
 class TestPostPaymentHook(ErpnextSyncTestBase):
 	def test_enqueue_after_commit(self):
 		inv = self._paid_invoice()
-		with patch("billing.erpnext_sync.frappe.enqueue") as enqueue:
+		with patch("billing.revenue.erpnext_sync.frappe.enqueue") as enqueue:
 			erpnext_sync.enqueue_invoice_sync(inv)
 		enqueue.assert_called_once()
 		self.assertEqual(enqueue.call_args.kwargs["invoice"], inv)

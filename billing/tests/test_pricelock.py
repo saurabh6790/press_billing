@@ -5,9 +5,9 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing.pricelock import get_locked_rate
-from billing.pricing import set_catalog_rates
-from billing.sync import receive_usage_events
+from billing.revenue.pricelock import get_locked_rate
+from billing.catalog.pricing import set_catalog_rates
+from billing.platform.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
 PLAN = "bundle-lock-test"

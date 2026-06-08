@@ -28,7 +28,7 @@ import { Badge, Button, createResource } from 'frappe-ui';
 import { store } from '../store';
 import InvoiceDialog from '../components/InvoiceDialog.vue';
 import { money, statusTheme } from '../utils';
-const invoices = createResource({ url: 'billing.dashboard.list_invoices', makeParams: () => ({ team: store.team }) });
+const invoices = createResource({ url: 'billing.api.dashboard.list_invoices', makeParams: () => ({ team: store.team }) });
 watch(() => store.team, (t) => t && invoices.reload(), { immediate: true });
 const showDialog = ref(false); const selected = ref(null);
 function open(name) { selected.value = name; showDialog.value = true; }

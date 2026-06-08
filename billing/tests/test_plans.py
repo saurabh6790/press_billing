@@ -4,8 +4,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing.plans import get_plan_pricing
-from billing.pricing import set_catalog_rates
+from billing.catalog.plans import get_plan_pricing
+from billing.catalog.pricing import set_catalog_rates
 from billing.tests.utils import make_plan
 
 

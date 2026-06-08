@@ -53,10 +53,10 @@ import { Badge, createResource } from 'frappe-ui';
 import Panel from '../components/Panel.vue';
 import { money, titleCase, standingTheme } from '../utils';
 const a = (url) => createResource({ url, auto: true });
-const trial = a('billing.admin.get_trial_costs_detail');
-const conv = a('billing.admin.get_conversion');
-const cluster = a('billing.admin.get_cluster_consumption');
-const plan = a('billing.admin.get_plan_consumption');
-const delinquent = a('billing.admin.get_delinquent_teams');
-const failures = a('billing.admin.get_payment_failures');
+const trial = a('billing.api.admin.get_trial_costs_detail');
+const conv = a('billing.api.admin.get_conversion');
+const cluster = a('billing.api.admin.get_cluster_consumption');
+const plan = a('billing.api.admin.get_plan_consumption');
+const delinquent = a('billing.api.admin.get_delinquent_teams');
+const failures = a('billing.api.admin.get_payment_failures');
 </script>

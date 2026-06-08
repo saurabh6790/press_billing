@@ -16,7 +16,7 @@ residual shortfall at settlement flows into dunning.
 
 import frappe
 
-from billing import credits
+from billing.revenue import credits
 
 AUTOPAY_METHODS = ("card", "upi_autopay")
 FORECAST_NOTIFY_RATIO = 0.8
@@ -103,7 +103,7 @@ def credit_forecast(team: str, projected_spend, notify: bool = True) -> dict:
 
 def _notify_top_up(team: str, balance, projected, utilisation):
 	"""Emit the credit-low top-up prompt through the notification suite (#20)."""
-	from billing import notifications
+	from billing.platform import notifications
 
 	notifications.notify(team, "credit_low", context={"utilisation": f"{utilisation:.0%}"})
 	frappe.publish_realtime(

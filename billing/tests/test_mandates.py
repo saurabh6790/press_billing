@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import mandates
-from billing.entitlements import recompute_trust_tier
+from billing.payments import mandates
+from billing.catalog.entitlements import recompute_trust_tier
 from billing.tests.test_entitlements import make_ladder
 
 TEAM = "team-mandate"
@@ -244,14 +244,14 @@ class TestAddMethodGatewayResolution(IntegrationTestCase):
 		}).insert(ignore_permissions=True)
 
 	def test_razorpay_wins_over_default_stripe_for_inr(self):
-		from billing import dashboard
+		from billing.api import dashboard
 
 		self._gw("GW-Res-Stripe-INR", "stripe", "INR", default=1)
 		self._gw("GW-Res-RZP-INR", "razorpay", "INR", default=0)
-		self.assertEqual(dashboard._add_method_gateway("INR").adapter_key, "razorpay")
+		self.assertEqual(dashboard._shared._add_method_gateway("INR").adapter_key, "razorpay")
 
 	def test_stripe_when_no_razorpay_for_currency(self):
-		from billing import dashboard
+		from billing.api import dashboard
 
 		self._gw("GW-Res-Stripe-EUR", "stripe", "EUR", default=1)
-		self.assertEqual(dashboard._add_method_gateway("EUR").adapter_key, "stripe")
+		self.assertEqual(dashboard._shared._add_method_gateway("EUR").adapter_key, "stripe")

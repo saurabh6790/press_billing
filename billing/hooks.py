@@ -96,8 +96,8 @@ website_route_rules = [
 
 # Ensure billing roles (#22) + the User->team link field exist after migrate.
 after_migrate = [
-	"billing.security.ensure_billing_roles",
-	"billing.dashboard.ensure_billing_team_field",
+	"billing.platform.security.ensure_billing_roles",
+	"billing.api.dashboard.ensure_billing_team_field",
 ]
 
 # Uninstallation
@@ -126,7 +126,7 @@ after_migrate = [
 # ------------------
 # See frappe.core.notifications.get_notification_config
 
-# notification_config = "billing.notifications.get_notification_config"
+# notification_config = "billing.platform.notifications.get_notification_config"
 
 # Permissions
 # -----------
@@ -159,17 +159,17 @@ scheduler_events = {
 	# Retry/dunning + staged suspension for unpaid invoices, and ERPNext sync
 	# retries whose backoff window has elapsed.
 	"daily": [
-		"billing.dunning.run_dunning",
-		"billing.reconciliation.run_reconciliation",
+		"billing.revenue.dunning.run_dunning",
+		"billing.payments.reconciliation.run_reconciliation",
 		# Prune Payment Attempt + Webhook Event logs past the 3-month window.
-		"billing.charges.cleanup_payment_logs",
+		"billing.payments.charges.cleanup_payment_logs",
 	],
 	"hourly": [
-		"billing.erpnext_sync.retry_failed_syncs",
+		"billing.revenue.erpnext_sync.retry_failed_syncs",
 	],
 	# Cards expire at the end of their printed month; flip lapsed ones monthly.
 	"monthly": [
-		"billing.payments.expire_payment_methods",
+		"billing.payments.payments.expire_payment_methods",
 	],
 }
 
@@ -192,7 +192,7 @@ scheduler_events = {
 # 	"Task": "billing.task.get_dashboard_data"
 # }
 override_doctype_dashboards = {
-	"Currency": "billing.dashboard_overrides.currency_dashboard",
+	"Currency": "billing.api.dashboard_overrides.currency_dashboard",
 }
 
 # exempt linked doctypes from being automatically cancelled

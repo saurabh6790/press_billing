@@ -11,7 +11,7 @@ No schema change, no billing change — millicores/ratio never reach the data.
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import plans
+from billing.catalog import plans
 
 PLAN = "bundle-configured-test"
 

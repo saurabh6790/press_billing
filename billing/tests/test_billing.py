@@ -7,8 +7,9 @@ import threading
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import invoicing, credits, subscriptions
-from billing.sync import receive_usage_events
+from billing.revenue import invoicing, credits
+from billing.catalog import subscriptions
+from billing.platform.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
 TEAM = "team-invoice"

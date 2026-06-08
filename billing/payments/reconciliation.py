@@ -79,7 +79,7 @@ def run_reconciliation(now=None) -> list:
 
 def _resolve_paid(attempt):
 	"""Settle through the same idempotent path a webhook uses; tag provenance."""
-	from billing import charges
+	from billing.payments import charges
 
 	attempt.status = "captured"
 	attempt.completed_at = frappe.utils.now_datetime()

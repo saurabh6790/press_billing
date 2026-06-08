@@ -8,7 +8,9 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import invoicing, credits, refunds, subscriptions
+from billing.revenue import invoicing, credits
+from billing.payments import refunds
+from billing.catalog import subscriptions
 from billing.gateways.base import RefundResult
 from billing.tests.test_stripe_adapter import make_stripe_gateway
 from billing.tests.utils import make_plan
@@ -138,7 +140,7 @@ class TestSymmetry(RefundTestBase):
 class TestPrePaymentCorrection(RefundTestBase):
 	def test_cancel_and_reissue_does_not_mutate_line_items(self):
 		# An Open invoice is corrected by cancel + reissue, not by editing.
-		from billing.sync import receive_usage_events
+		from billing.platform.sync import receive_usage_events
 
 		receive_usage_events(
 			[{"event_id": "ev-r", "team": TEAM, "resource_id": "srv-r", "cluster": CLUSTER,

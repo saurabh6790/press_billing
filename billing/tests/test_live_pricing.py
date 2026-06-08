@@ -12,9 +12,9 @@ required to bill it).
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import metering
-from billing.pricing import set_catalog_rates
-from billing.sync import receive_meter_rollups
+from billing.revenue import metering
+from billing.catalog.pricing import set_catalog_rates
+from billing.platform.sync import receive_meter_rollups
 from billing.tests.utils import make_addon
 
 TEAM = "team-live"

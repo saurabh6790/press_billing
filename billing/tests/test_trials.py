@@ -5,10 +5,11 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import invoicing, credits, subscriptions, trials
-from billing.entitlements import recompute_trust_tier
-from billing.signing import generate_keypair
-from billing.sync import receive_usage_events
+from billing.revenue import invoicing, credits
+from billing.catalog import subscriptions, trials
+from billing.catalog.entitlements import recompute_trust_tier
+from billing.catalog.signing import generate_keypair
+from billing.platform.sync import receive_usage_events
 from billing.tests.test_entitlements import make_ladder
 from billing.tests.utils import make_plan
 

@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 """Demo seed — a rich, self-consistent billing team for the Desk demo.
 
-    bench --site billing.local execute billing.demo.seed
+    bench --site billing.local execute billing.demo.demo.seed
 
 Idempotent: re-running wipes the demo team's data and rebuilds it. Produces a
 paid invoice + an open invoice (fixed + metered + GST lines), a funded wallet
@@ -12,9 +12,10 @@ plan catalog, a GST tax profile, and a Billing workspace to navigate it all.
 
 import frappe
 
-from billing import invoicing, credits, subscriptions
-from billing.pricing import set_catalog_rates
-from billing.sync import receive_meter_rollups, receive_usage_events
+from billing.revenue import invoicing, credits
+from billing.catalog import subscriptions
+from billing.catalog.pricing import set_catalog_rates
+from billing.platform.sync import receive_meter_rollups, receive_usage_events
 
 TEAM = "demo"
 CLUSTER = "ap-south-1"

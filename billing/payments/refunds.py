@@ -18,7 +18,7 @@ issued line item is never mutated (see billing.reissue_invoice).
 
 import frappe
 
-from billing import credits
+from billing.revenue import credits
 
 
 def _adapter(gateway: str):

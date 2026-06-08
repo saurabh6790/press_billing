@@ -11,8 +11,9 @@ usage and one-off add-ons bill at list. See final-plan-pricing.md §5 / ADR 0001
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import invoicing, subscriptions
-from billing.sync import receive_usage_events
+from billing.revenue import invoicing
+from billing.catalog import subscriptions
+from billing.platform.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
 TEAM = "team-commitment"

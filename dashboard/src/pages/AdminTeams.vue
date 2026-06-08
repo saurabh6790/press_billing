@@ -62,7 +62,7 @@ import TeamDetailDialog from '../components/TeamDetailDialog.vue';
 import { money, titleCase, standingTheme } from '../utils';
 
 const route = useRoute();
-const teams = createResource({ url: 'billing.admin.list_teams', auto: true });
+const teams = createResource({ url: 'billing.api.admin.list_teams', auto: true });
 
 const fStatus = ref('all');
 const fTier = ref('all');

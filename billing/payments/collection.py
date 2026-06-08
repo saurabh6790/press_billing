@@ -22,7 +22,7 @@ event-driven, not a synchronous try/except cascade:
 
 import frappe
 
-from billing import charges
+from billing.payments import charges
 
 
 def ordered_methods(team: str) -> list:

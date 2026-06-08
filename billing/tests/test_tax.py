@@ -5,8 +5,9 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import invoicing, subscriptions, tax
-from billing.sync import receive_usage_events
+from billing.revenue import invoicing, tax
+from billing.catalog import subscriptions
+from billing.platform.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
 TEAM = "team-tax"

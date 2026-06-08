@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import payments
+from billing.payments import payments
 from billing.tests.test_stripe_adapter import make_stripe_gateway
 
 TEAM = "team-cards"

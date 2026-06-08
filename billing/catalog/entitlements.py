@@ -9,7 +9,7 @@ This module owns only the historical/promotion side.
 
 import frappe
 
-from billing.signing import sign_payload
+from billing.catalog.signing import sign_payload
 
 _LEVEL_FIELDS = (
 	"name",
@@ -88,7 +88,7 @@ def recompute_trust_tier(team: str, paid_invoice_count: int, cumulative_paid):
 
 	# Mandate ceilings are tied to the cap; a raised cap needs customer re-consent
 	# (the team is held at the old ceiling until re-authorisation). #08
-	from billing import mandates
+	from billing.payments import mandates
 
 	mandates.reconcile_mandates_to_cap(team)
 	return tier

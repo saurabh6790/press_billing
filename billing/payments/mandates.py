@@ -155,7 +155,7 @@ def confirm_mandate(payment_method: str, callback: dict):
 	if method.method_type == MANDATE_METHOD:
 		_retire_superseded_mandates(method)
 
-	from billing import payments
+	from billing.payments import payments
 
 	payments.densify_priorities(method.team)  # slot the new method into the fallback order
 	method.reload()

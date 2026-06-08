@@ -3,7 +3,7 @@
 
 from frappe.model.document import Document
 
-from billing.pricing import get_catalog_rates, resolve_rate
+from billing.catalog.pricing import get_catalog_rates, resolve_rate
 
 
 class Plan(Document):

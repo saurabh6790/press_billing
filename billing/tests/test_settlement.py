@@ -8,9 +8,11 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import invoicing, credits, settlement, subscriptions
+from billing.revenue import invoicing, credits
+from billing.payments import settlement
+from billing.catalog import subscriptions
 from billing.gateways.base import PaymentResult
-from billing.settlement import (
+from billing.payments.settlement import (
 	can_accept_spend,
 	credit_forecast,
 	effective_spend_cap,

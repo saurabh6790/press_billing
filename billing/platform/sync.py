@@ -58,7 +58,7 @@ def receive_usage_events(events) -> dict:
 	Agent marks exactly those `synced_to_central`, so a partial failure is
 	retried on the next push rather than silently dropped.
 	"""
-	from billing.pricelock import lock_from_event
+	from billing.revenue.pricelock import lock_from_event
 
 	if isinstance(events, str):
 		events = frappe.parse_json(events)
@@ -80,7 +80,7 @@ def receive_meter_rollups(meters) -> dict:
 	figure rather than adding. Returns the acknowledged keys so the Agent marks
 	exactly those synced.
 	"""
-	from billing.metering import ingest_rollup
+	from billing.revenue.metering import ingest_rollup
 
 	if isinstance(meters, str):
 		meters = frappe.parse_json(meters)

@@ -13,9 +13,10 @@ import stripe
 from frappe.tests import IntegrationTestCase
 
 import billing
-from billing import security, subscriptions
+from billing.platform import security
+from billing.catalog import subscriptions
 from billing.tests.test_stripe_adapter import make_stripe_gateway
-from billing.webhooks import process_webhook
+from billing.payments.webhooks import process_webhook
 
 FLOOD_EVENT = "evt_flood_1"
 FLOOD_PAYLOAD = (
@@ -78,7 +79,7 @@ class TestPermissionGuards(IntegrationTestCase):
 
 	def test_team_scoping_rejects_other_team(self):
 		frappe.set_user(self.user)
-		with patch("billing.security.get_user_team", return_value="team-self"):
+		with patch("billing.platform.security.get_user_team", return_value="team-self"):
 			security.require_team_access("team-self")  # own team ok
 			with self.assertRaises(frappe.PermissionError):
 				security.require_team_access("team-other")  # never silently widened
@@ -172,8 +173,8 @@ class TestLoadTwoPhase(IntegrationTestCase):
 		frappe.db.commit()
 
 	def test_thousand_scale_run_no_double_processing(self):
-		from billing import invoicing
-		from billing.sync import receive_usage_events
+		from billing.revenue import invoicing
+		from billing.platform.sync import receive_usage_events
 
 		for i, team in enumerate(self._teams):
 			receive_usage_events(

@@ -3,7 +3,7 @@
 
 from frappe.tests import IntegrationTestCase
 
-from billing.pricing import resolve_rate
+from billing.catalog.pricing import resolve_rate
 
 
 def _rows(*triples):

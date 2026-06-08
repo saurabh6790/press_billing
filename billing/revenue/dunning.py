@@ -20,8 +20,8 @@ _state on the Agent).
 
 import frappe
 
-from billing import subscriptions
-from billing.entitlements import issue_token
+from billing.catalog import subscriptions
+from billing.catalog.entitlements import issue_token
 
 RETRY_DAYS = [1, 3, 7]
 SUSPEND_AFTER_DAYS = 14
@@ -35,7 +35,8 @@ def _notify(invoice, message: str):
 def retry_payment(invoice_name: str) -> dict:
 	"""One dunning retry: charge the next untried method (primary→backup, #28),
 	notified with the reason on failure."""
-	from billing import collection, notifications
+	from billing.payments import collection
+	from billing.platform import notifications
 
 	result = collection.collect_invoice(invoice_name)
 	last = frappe.get_all(
@@ -99,7 +100,7 @@ def process_invoice_dunning(invoice_name: str, now=None) -> dict:
 	# --- retries: try the next untried method, if any (escalate, don't repeat,
 	# #28). Once every method has failed there is nothing left to charge, so the
 	# stages below escalate. Credits-only teams (no methods) skip straight there.
-	from billing import collection
+	from billing.payments import collection
 
 	if inv.status == "Open" and collection.next_method_for(invoice_name, inv.team):
 		retry_payment(invoice_name)
@@ -115,7 +116,7 @@ def process_invoice_dunning(invoice_name: str, now=None) -> dict:
 		if inv.status == "Open":
 			inv.db_set("status", "Overdue")
 			actions.append("overdue")
-			from billing import notifications
+			from billing.platform import notifications
 
 			notifications.notify(
 				inv.team, "invoice_overdue", context={"invoice": invoice_name},

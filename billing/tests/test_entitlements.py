@@ -4,7 +4,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing.entitlements import evaluate_tier, get_ladder, recompute_trust_tier
+from billing.catalog.entitlements import evaluate_tier, get_ladder, recompute_trust_tier
 
 LADDER = [
 	{"tier": "t0", "sequence": 0, "is_default": 1, "max_spend": 100, "max_resource_count": 1,

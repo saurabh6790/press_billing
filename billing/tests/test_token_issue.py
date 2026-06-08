@@ -4,8 +4,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing.entitlements import issue_token, recompute_trust_tier
-from billing.signing import generate_keypair, verify_payload
+from billing.catalog.entitlements import issue_token, recompute_trust_tier
+from billing.catalog.signing import generate_keypair, verify_payload
 from billing.tests.test_entitlements import make_ladder
 
 

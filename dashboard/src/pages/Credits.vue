@@ -39,11 +39,11 @@ const noticeClass = computed(() => ({
   info: 'bg-surface-gray-2 text-ink-gray-7',
 }[notice.value?.type] || ''));
 const mk = (url) => createResource({ url, makeParams: () => ({ team: store.team }) });
-const balance = mk('billing.dashboard.get_credit_balance');
+const balance = mk('billing.api.dashboard.get_credit_balance');
 const cur = computed(() => balance.data?.currency || 'INR');
-const ledger = mk('billing.dashboard.credit_ledger');
-const profile = mk('billing.dashboard.get_billing_profile');
-const confirmTopup = createResource({ url: 'billing.dashboard.confirm_topup' });
+const ledger = mk('billing.api.dashboard.credit_ledger');
+const profile = mk('billing.api.dashboard.get_billing_profile');
+const confirmTopup = createResource({ url: 'billing.api.dashboard.confirm_topup' });
 watch(() => store.team, (t) => { if (t) [balance,ledger,profile].forEach((r) => r.reload()); }, { immediate: true });
 
 // Return leg of the hosted Stripe Checkout redirect: confirm the session, then

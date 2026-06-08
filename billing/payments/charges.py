@@ -171,7 +171,7 @@ def apply_webhook(event_name: str) -> dict:
 			attempt.status = "failed"
 			attempt.completed_at = frappe.utils.now_datetime()
 			attempt.save(ignore_permissions=True)
-			from billing import notifications
+			from billing.platform import notifications
 
 			notifications.notify(
 				attempt.team, "payment_failure",
@@ -181,7 +181,7 @@ def apply_webhook(event_name: str) -> dict:
 			# Async decline: rotate to the next untried method (#28). No-op once
 			# every method has been exhausted.
 			if inv_status in ("Open", "Overdue"):
-				from billing import collection
+				from billing.payments import collection
 
 				fell_back = collection.collect_invoice(attempt.invoice)
 		_mark_event(event, "processed")
@@ -206,7 +206,7 @@ def _settle_invoice(attempt) -> bool:
 	inv.status = "Paid"
 	inv.save(ignore_permissions=True)
 
-	from billing import notifications
+	from billing.platform import notifications
 
 	notifications.notify(
 		inv.team, "payment_success",
@@ -215,7 +215,7 @@ def _settle_invoice(attempt) -> bool:
 	)
 
 	# Async, one-way, non-blocking push to the statutory SOR (#17).
-	from billing.erpnext_sync import enqueue_invoice_sync
+	from billing.revenue.erpnext_sync import enqueue_invoice_sync
 
 	enqueue_invoice_sync(inv.name)
 	return True

@@ -5,7 +5,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import notifications, settlement
+from billing.platform import notifications
+from billing.payments import settlement
 
 TEAM = "team-notify"
 
@@ -70,7 +71,7 @@ class TestNotify(NotificationTestBase):
 
 class TestWiredEvents(NotificationTestBase):
 	def test_credit_low_uses_forecast_threshold(self):
-		from billing import credits
+		from billing.revenue import credits
 
 		credits.purchase(TEAM, 100, "INR")
 		# Projected spend at 80% of balance → the credit_low notification fires.
@@ -78,7 +79,7 @@ class TestWiredEvents(NotificationTestBase):
 		self.assertTrue(self._logs("credit_low"))
 
 	def test_credit_low_does_not_fire_below_threshold(self):
-		from billing import credits
+		from billing.revenue import credits
 
 		credits.purchase(TEAM, 100, "INR")
 		settlement.credit_forecast(TEAM, 50, notify=True)

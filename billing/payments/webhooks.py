@@ -81,7 +81,7 @@ def _store_and_enqueue(gateway, event, payload: bytes):
 		return  # lost the race — another request stored it first
 
 	frappe.enqueue(
-		"billing.webhooks.handle_webhook_event",
+		"billing.payments.webhooks.handle_webhook_event",
 		event_name=doc.name,
 		enqueue_after_commit=True,
 	)
@@ -93,6 +93,6 @@ def handle_webhook_event(event_name: str):
 	Charge settlement (Open -> Paid) lives in charges.apply_webhook; this is the
 	dispatch point. Other event families are added as their issues land.
 	"""
-	from billing import charges
+	from billing.payments import charges
 
 	return charges.apply_webhook(event_name)

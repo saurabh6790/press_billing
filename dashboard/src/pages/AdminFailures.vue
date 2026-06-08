@@ -43,6 +43,6 @@
 <script setup>
 import { createResource } from 'frappe-ui';
 import { money } from '../utils';
-const failures = createResource({ url: 'billing.admin.get_payment_failures', auto: true });
-const analytics = createResource({ url: 'billing.admin.get_payment_analytics', auto: true });
+const failures = createResource({ url: 'billing.api.admin.get_payment_failures', auto: true });
+const analytics = createResource({ url: 'billing.api.admin.get_payment_analytics', auto: true });
 </script>

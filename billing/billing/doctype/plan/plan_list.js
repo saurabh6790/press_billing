@@ -26,7 +26,7 @@ frappe.listview_settings["Plan"] = {
 				primary_action_label: __("Create"),
 				primary_action(values) {
 					frappe.call({
-						method: "billing.plans.create_configured_plan",
+						method: "billing.catalog.plans.create_configured_plan",
 						args: values,
 						callback: (r) => {
 							if (r.message) {

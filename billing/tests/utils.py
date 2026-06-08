@@ -4,7 +4,7 @@
 
 import frappe
 
-from billing.pricing import set_catalog_rates
+from billing.catalog.pricing import set_catalog_rates
 
 DEFAULT_RATES = [
 	{"cluster": "", "currency": "USD", "rate": 40},

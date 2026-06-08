@@ -74,16 +74,16 @@ import { store } from '../store';
 import AddCardDialog from '../components/AddCardDialog.vue';
 
 const add = ref(false);
-const methods = createResource({ url: 'billing.dashboard.list_payment_methods', makeParams: () => ({ team: store.team }) });
-const profile = createResource({ url: 'billing.dashboard.get_billing_profile', makeParams: () => ({ team: store.team }) });
+const methods = createResource({ url: 'billing.api.dashboard.list_payment_methods', makeParams: () => ({ team: store.team }) });
+const profile = createResource({ url: 'billing.api.dashboard.get_billing_profile', makeParams: () => ({ team: store.team }) });
 watch(() => store.team, (t) => { if (t) { methods.reload(); profile.reload(); } }, { immediate: true });
 
 // API returns methods already ordered by priority (primary first).
 const list = computed(() => methods.data || []);
 
-const removeRes = createResource({ url: 'billing.dashboard.remove_payment_method', onSuccess: () => methods.reload() });
-const primaryRes = createResource({ url: 'billing.dashboard.set_default_payment_method', onSuccess: () => methods.reload() });
-const reorderRes = createResource({ url: 'billing.dashboard.reorder_payment_methods', onSuccess: () => methods.reload() });
+const removeRes = createResource({ url: 'billing.api.dashboard.remove_payment_method', onSuccess: () => methods.reload() });
+const primaryRes = createResource({ url: 'billing.api.dashboard.set_default_payment_method', onSuccess: () => methods.reload() });
+const reorderRes = createResource({ url: 'billing.api.dashboard.reorder_payment_methods', onSuccess: () => methods.reload() });
 const busy = computed(() => reorderRes.loading || primaryRes.loading || removeRes.loading);
 
 function remove(name) { removeRes.submit({ payment_method: name }); }

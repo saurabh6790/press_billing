@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from frappe.tests import IntegrationTestCase
 
-from billing.sync import push_plans_to_agent
+from billing.platform.sync import push_plans_to_agent
 from billing.tests.utils import make_plan
 
 
@@ -13,7 +13,7 @@ class TestPushPlansToAgent(IntegrationTestCase):
 	def test_posts_identity_includes_and_rates_to_agent_endpoint(self):
 		make_plan("bundle-test-push")
 
-		with patch("billing.sync.requests.post") as mock_post:
+		with patch("billing.platform.sync.requests.post") as mock_post:
 			mock_post.return_value = MagicMock(status_code=200)
 			mock_post.return_value.json.return_value = {"message": {"received": ["bundle-test-push"]}}
 

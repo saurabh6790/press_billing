@@ -5,7 +5,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import admin, security
+from billing.api import admin
+from billing.platform import security
 from billing.tests.utils import make_plan
 
 PLAN = "bundle-admin-test"
@@ -100,7 +101,7 @@ class TestPanels(AdminTestBase):
 
 	def test_team_lookup_returns_full_picture(self):
 		self._invoice(TEAM_A, 1000)
-		from billing import credits
+		from billing.revenue import credits
 
 		credits.purchase(TEAM_A, 250, "INR")
 		out = admin.get_team_billing(TEAM_A)
@@ -127,7 +128,7 @@ class TestPriceManagement(AdminTestBase):
 
 class TestMetricsReports(AdminTestBase):
 	def test_metrics_counts_and_mrr(self):
-		from billing import subscriptions
+		from billing.catalog import subscriptions
 
 		subscriptions.create_subscription(team=TEAM_A, cluster="ap-south-1", plan=PLAN, billing_cycle="monthly")
 		sub_b = subscriptions.create_subscription(team=TEAM_B, cluster="ap-south-1", plan=PLAN, billing_cycle="monthly")

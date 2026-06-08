@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import charges, collection, payments
+from billing.payments import charges, collection, payments
 from billing.gateways.base import PaymentResult
 from billing.tests.test_stripe_adapter import make_stripe_gateway
 from billing.tests.utils import make_plan

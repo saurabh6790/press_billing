@@ -11,7 +11,7 @@ from frappe.tests import IntegrationTestCase
 
 from billing.tests.test_razorpay_adapter import make_razorpay_gateway
 from billing.tests.test_stripe_adapter import make_stripe_gateway
-from billing.webhooks import process_webhook
+from billing.payments.webhooks import process_webhook
 
 EVENT_ID = "evt_webhook_500"
 PAYLOAD = (

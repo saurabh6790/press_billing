@@ -52,7 +52,7 @@ import { computed, watch } from 'vue';
 import { Badge, createResource } from 'frappe-ui';
 import { store } from '../store';
 import { money, attemptLabel, attemptTheme } from '../utils';
-const attempts = createResource({ url: 'billing.dashboard.list_payment_attempts', makeParams: () => ({ team: store.team }) });
+const attempts = createResource({ url: 'billing.api.dashboard.list_payment_attempts', makeParams: () => ({ team: store.team }) });
 watch(() => store.team, (t) => t && attempts.reload(), { immediate: true });
 const failedCount = computed(() => (attempts.data || []).filter((a) => a.status === 'failed').length);
 </script>

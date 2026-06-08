@@ -17,7 +17,7 @@ Two pricing modes (per the Add-on's `pricing_mode`, ADR 0002):
 
 import frappe
 
-from billing.pricing import get_catalog_rates, resolve_rate
+from billing.catalog.pricing import get_catalog_rates, resolve_rate
 
 
 def _addon_for(resource_type: str):
