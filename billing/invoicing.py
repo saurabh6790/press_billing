@@ -275,7 +275,7 @@ def generate_draft_invoices(period_start, period_end, enqueue: bool = False) -> 
 	for team, sub in primary.items():
 		if enqueue:
 			frappe.enqueue(
-				"billing.billing.generate_team_invoice",
+				"billing.invoicing.generate_team_invoice",
 				team=team,
 				period_start=period_start,
 				period_end=period_end,
@@ -371,7 +371,7 @@ def open_drafts(period_end, enqueue: bool = False) -> list[str]:
 	)
 	for inv in drafts:
 		if enqueue:
-			frappe.enqueue("billing.billing.open_and_collect", invoice=inv)
+			frappe.enqueue("billing.invoicing.open_and_collect", invoice=inv)
 		else:
 			open_and_collect(inv)
 	return drafts

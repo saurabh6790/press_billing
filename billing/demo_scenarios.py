@@ -23,7 +23,7 @@ The Agent-side mirror lives in press_billing_agent.demo.seed.
 
 import frappe
 
-from billing import billing, credits, notifications, subscriptions
+from billing import invoicing, credits, notifications, subscriptions
 from billing.pricing import set_catalog_rates
 from billing.sync import receive_meter_rollups, receive_usage_events
 
@@ -173,7 +173,7 @@ def _build_team(team, tier, currency, months, state, resources):
 	primary_sub = subs[0]
 
 	for start, end in periods:
-		inv = billing.generate_team_invoice(team, start, end, subscription=primary_sub)
+		inv = invoicing.generate_team_invoice(team, start, end, subscription=primary_sub)
 		if inv:
 			total = frappe.db.get_value("Invoice", inv, "expected_collection")
 			frappe.db.set_value("Invoice", inv, {
@@ -194,12 +194,12 @@ def _set_team_standing(team, standing, changed_by="dunning"):
 def _finish_current_month(team, sub, currency, state, pm, gateway):
 	"""Build the open/June invoice (one consolidated invoice) in the team's terminal state."""
 	if state == "trial":
-		inv = billing.generate_team_invoice(team, ANCHOR, "2026-06-30", subscription=sub)
+		inv = invoicing.generate_team_invoice(team, ANCHOR, "2026-06-30", subscription=sub)
 		if inv:
-			billing.open_and_collect(inv)  # cost_report → opened, never charged
+			invoicing.open_and_collect(inv)  # cost_report → opened, never charged
 		return "trial cost report"
 
-	inv = billing.generate_team_invoice(team, ANCHOR, "2026-06-30", subscription=sub)
+	inv = invoicing.generate_team_invoice(team, ANCHOR, "2026-06-30", subscription=sub)
 	if not inv:
 		return state
 
@@ -236,7 +236,7 @@ def _finish_current_month(team, sub, currency, state, pm, gateway):
 	if state == "credits":
 		# Deliberately under-fund so the prepaid shortfall + credit alert show.
 		credits.purchase(team, 1000, currency, note="Demo top-up")
-		billing.open_and_collect(inv)  # credits-first; remainder Open for dunning
+		invoicing.open_and_collect(inv)  # credits-first; remainder Open for dunning
 		return "prepaid credits applied + Open remainder (shortfall)"
 
 	if state == "refund":

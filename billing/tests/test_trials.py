@@ -5,7 +5,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import billing, credits, subscriptions, trials
+from billing import invoicing, credits, subscriptions, trials
 from billing.entitlements import recompute_trust_tier
 from billing.signing import generate_keypair
 from billing.sync import receive_usage_events
@@ -66,15 +66,15 @@ class TestCostReportGeneration(TrialTestBase):
 	def test_entry_tier_invoice_is_cost_report(self):
 		self.assertTrue(trials.is_trial_team(TEAM))
 		provision()
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		self.assertEqual(frappe.db.get_value("Invoice", name, "invoice_type"), "cost_report")
 
 	def test_cost_report_is_computed_but_not_charged(self):
 		provision()
 		credits.purchase(TEAM, 500, "INR")  # even with a wallet, nothing is drawn
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 
-		result = billing.open_and_collect(name)
+		result = invoicing.open_and_collect(name)
 		inv = frappe.get_doc("Invoice", name)
 		self.assertTrue(result.get("cost_report"))
 		self.assertEqual(inv.status, "Open")
@@ -89,14 +89,14 @@ class TestConversion(TrialTestBase):
 	def test_convert_to_paid_flips_type_and_keeps_resources(self):
 		provision()
 		# June: trial → cost_report.
-		june = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		june = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		self.assertEqual(frappe.db.get_value("Invoice", june, "invoice_type"), "cost_report")
 
 		trials.convert_to_paid(TEAM)
 		self.assertFalse(trials.is_trial_team(TEAM))
 
 		# July invoice is billable; the resource's lock is untouched (still running).
-		july = billing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
+		july = invoicing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
 		self.assertEqual(frappe.db.get_value("Invoice", july, "invoice_type"), "billable")
 		active_locks = frappe.get_all(
 			"Price Lock", {"team": TEAM, "resource_id": "srv-trial", "ended_at": ["is", "not set"]}
@@ -112,7 +112,7 @@ class TestSubsidyAndExpiry(TrialTestBase):
 		# A far-future period isolates this global aggregate from seeded demo data.
 		provision("srv-a", rate=1000, start="2099-01-01 00:00:00")
 		provision("srv-b", rate=2000, start="2099-01-01 00:00:00")
-		name = billing.generate_draft_invoice(self.sub, "2099-01-01", "2099-01-31")
+		name = invoicing.generate_draft_invoice(self.sub, "2099-01-01", "2099-01-31")
 		self.assertEqual(frappe.db.get_value("Invoice", name, "invoice_type"), "cost_report")
 
 		subsidy = trials.subsidy_total("2099-01-01", "2099-01-31")

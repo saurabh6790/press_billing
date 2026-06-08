@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import billing, credits, settlement, subscriptions
+from billing import invoicing, credits, settlement, subscriptions
 from billing.gateways.base import PaymentResult
 from billing.settlement import (
 	can_accept_spend,
@@ -118,7 +118,7 @@ class TestWaterfall(SettlementTestBase):
 		inv = self._draft(sub, 1000)
 
 		with stub_adapter(success=True, txn_id="pi_rem") as adapter:
-			result = billing.open_and_collect(inv)
+			result = invoicing.open_and_collect(inv)
 
 		invoice = frappe.get_doc("Invoice", inv)
 		self.assertEqual(invoice.credit_applied, 400.0)
@@ -137,7 +137,7 @@ class TestWaterfall(SettlementTestBase):
 		inv = self._draft(sub, 1000)
 
 		with stub_adapter() as adapter:
-			result = billing.open_and_collect(inv)
+			result = invoicing.open_and_collect(inv)
 
 		self.assertEqual(result["status"], "Paid")
 		self.assertEqual(frappe.db.get_value("Invoice", inv, "status"), "Paid")
@@ -149,7 +149,7 @@ class TestWaterfall(SettlementTestBase):
 		inv = self._draft(sub, 1000)
 
 		with stub_adapter(success=False):
-			billing.open_and_collect(inv)
+			invoicing.open_and_collect(inv)
 
 		# Declined remainder: invoice stays Open for dunning (#14), not stopped.
 		self.assertEqual(frappe.db.get_value("Invoice", inv, "status"), "Open")

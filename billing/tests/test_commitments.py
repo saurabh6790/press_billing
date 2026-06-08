@@ -11,7 +11,7 @@ usage and one-off add-ons bill at list. See final-plan-pricing.md §5 / ADR 0001
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import billing, subscriptions
+from billing import invoicing, subscriptions
 from billing.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
@@ -81,7 +81,7 @@ class TestCommitmentDiscount(CommitmentTestBase):
 		push_event("e1", "R1", 1000, "2026-06-01 00:00:00", "subscribed")
 		make_commitment(TEAM, floor=800, discount_pct=20)
 
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 
 		self.assertEqual(inv.subtotal, 1000.0)  # gross, unchanged
@@ -94,7 +94,7 @@ class TestCommitmentDiscount(CommitmentTestBase):
 		push_event("e1", "R1", 1000, "2026-06-16 00:00:00", "subscribed")  # Jun16-30 = 15d
 		make_commitment(TEAM, floor=800, discount_pct=20)
 
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 
 		self.assertEqual(inv.subtotal, 500.0)  # 15 * 1000/30
@@ -127,7 +127,7 @@ class TestCommitmentDiscount(CommitmentTestBase):
 		self._metered_rollup("R-transfer", "transfer", quantity=300, rate=1)
 		make_commitment(TEAM, floor=800, discount_pct=20)
 
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 
 		self.assertEqual(inv.subtotal, 1300.0)  # 1000 bundle + 300 metered, gross
@@ -137,7 +137,7 @@ class TestCommitmentDiscount(CommitmentTestBase):
 	def test_no_commitment_leaves_invoice_unchanged(self):
 		push_event("e1", "R1", 1000, "2026-06-01 00:00:00", "subscribed")
 		# No commitment created.
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 
 		self.assertEqual(inv.commitment_discount, 0.0)
@@ -151,12 +151,12 @@ class TestCommitmentClawback(CommitmentTestBase):
 
 		# June: full month at 1000 -> floor met, discount 200 enjoyed.
 		push_event("e1", "R1", 1000, "2026-06-01 00:00:00", "subscribed")
-		june = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		june = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		self.assertEqual(frappe.get_doc("Invoice", june).commitment_discount, 200.0)
 
 		# July: resource terminated Jul16 -> 15 days, spend < 800 floor -> breach.
 		push_event("e2", "R1", 1000, "2026-07-16 00:00:00", "cancelled")
-		july = billing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
+		july = invoicing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
 		inv = frappe.get_doc("Invoice", july)
 
 		self.assertEqual(inv.commitment_discount, 0.0)  # no discount in the breach month
@@ -169,9 +169,9 @@ class TestCommitmentClawback(CommitmentTestBase):
 
 		# June at 1000, then July upgraded to 2000 — spend stays above the floor.
 		push_event("e1", "R1", 1000, "2026-06-01 00:00:00", "subscribed")
-		billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		push_event("e2", "R1", 2000, "2026-07-01 00:00:00", "changed")
-		july = billing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
+		july = invoicing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
 		inv = frappe.get_doc("Invoice", july)
 
 		self.assertEqual(inv.commitment_clawback, 0.0)  # spending more never claws back
@@ -181,11 +181,11 @@ class TestCommitmentClawback(CommitmentTestBase):
 	def test_clawback_is_idempotent(self):
 		commitment = make_commitment(TEAM, floor=800, discount_pct=20, started_at="2026-06-01")
 		push_event("e1", "R1", 1000, "2026-06-01 00:00:00", "subscribed")
-		billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		push_event("e2", "R1", 1000, "2026-07-16 00:00:00", "cancelled")
 
-		first = billing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
-		second = billing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
+		first = invoicing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
+		second = invoicing.generate_draft_invoice(self.sub, "2026-07-01", "2026-07-31")
 
 		self.assertEqual(first, second)  # same invoice, not a second one
 		self.assertEqual(frappe.get_doc("Invoice", second).commitment_clawback, 200.0)  # not doubled

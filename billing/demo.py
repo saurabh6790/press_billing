@@ -12,7 +12,7 @@ plan catalog, a GST tax profile, and a Billing workspace to navigate it all.
 
 import frappe
 
-from billing import billing, credits, subscriptions
+from billing import invoicing, credits, subscriptions
 from billing.pricing import set_catalog_rates
 from billing.sync import receive_meter_rollups, receive_usage_events
 
@@ -194,7 +194,7 @@ def _payment_method():
 
 
 def _paid_invoice(sub):
-	name = billing.generate_draft_invoice(sub, "2026-05-01", "2026-05-31")
+	name = invoicing.generate_draft_invoice(sub, "2026-05-01", "2026-05-31")
 	if not name:
 		return
 	# Settle May fully (demo: mark paid directly, no live gateway round-trip).
@@ -206,7 +206,7 @@ def _paid_invoice(sub):
 
 
 def _open_invoice(sub, card):
-	name = billing.generate_draft_invoice(sub, "2026-06-01", "2026-06-30")
+	name = invoicing.generate_draft_invoice(sub, "2026-06-01", "2026-06-30")
 	if not name:
 		return
 	# Leave June outstanding (no credits drawn) so the demo shows a funded wallet

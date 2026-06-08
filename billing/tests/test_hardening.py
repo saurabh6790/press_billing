@@ -172,7 +172,7 @@ class TestLoadTwoPhase(IntegrationTestCase):
 		frappe.db.commit()
 
 	def test_thousand_scale_run_no_double_processing(self):
-		from billing import billing
+		from billing import invoicing
 		from billing.sync import receive_usage_events
 
 		for i, team in enumerate(self._teams):
@@ -185,16 +185,16 @@ class TestLoadTwoPhase(IntegrationTestCase):
 				team=team, cluster=self.CLUSTER, plan=self.PLAN, billing_cycle="monthly"
 			)
 
-		drafts = billing.generate_draft_invoices("2026-06-01", "2026-06-30")
+		drafts = invoicing.generate_draft_invoices("2026-06-01", "2026-06-30")
 		mine = [d for d in drafts if frappe.db.get_value("Invoice", d, "team") in self._teams]
 		self.assertEqual(len(mine), self.N)  # one draft per subscription
 
 		# Re-running phase 1 must not create a second invoice per (sub, period).
-		billing.generate_draft_invoices("2026-06-01", "2026-06-30")
+		invoicing.generate_draft_invoices("2026-06-01", "2026-06-30")
 		for team in self._teams:
 			self.assertEqual(frappe.db.count("Invoice", {"team": team}), 1)
 
 		# Phase 2 opens each exactly once.
-		billing.open_drafts("2026-06-30")
+		invoicing.open_drafts("2026-06-30")
 		opened = sum(1 for d in mine if frappe.db.get_value("Invoice", d, "status") == "Open")
 		self.assertEqual(opened, self.N)

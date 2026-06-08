@@ -5,7 +5,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import billing, metering, subscriptions
+from billing import invoicing, metering, subscriptions
 from billing.sync import receive_meter_rollups, receive_usage_events
 from billing.tests.utils import make_addon, make_plan
 
@@ -122,7 +122,7 @@ class TestMeteredLineItems(MeteringTestBase):
 		sub = subscriptions.create_subscription(
 			team=TEAM, cluster=CLUSTER, plan=PLAN, billing_cycle="monthly"
 		).name
-		name = billing.generate_draft_invoice(sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 
 		resource_types = sorted(li.resource_type for li in inv.items)

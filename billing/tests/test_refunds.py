@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import billing, credits, refunds, subscriptions
+from billing import invoicing, credits, refunds, subscriptions
 from billing.gateways.base import RefundResult
 from billing.tests.test_stripe_adapter import make_stripe_gateway
 from billing.tests.utils import make_plan
@@ -148,9 +148,9 @@ class TestPrePaymentCorrection(RefundTestBase):
 		sub = subscriptions.create_subscription(
 			team=TEAM, cluster=CLUSTER, plan=PLAN, billing_cycle="monthly"
 		).name
-		first = billing.generate_draft_invoice(sub, "2026-06-01", "2026-06-30")
+		first = invoicing.generate_draft_invoice(sub, "2026-06-01", "2026-06-30")
 
-		reissued = billing.reissue_invoice(first, reason="wrong cluster")
+		reissued = invoicing.reissue_invoice(first, reason="wrong cluster")
 		self.assertNotEqual(reissued, first)
 		self.assertEqual(frappe.db.get_value("Invoice", first, "status"), "Cancelled")
 		self.assertEqual(frappe.db.get_value("Invoice", reissued, "status"), "Draft")
@@ -158,4 +158,4 @@ class TestPrePaymentCorrection(RefundTestBase):
 	def test_cannot_cancel_a_paid_invoice(self):
 		inv, _ = self._paid_invoice_with_attempt(1000)
 		with self.assertRaises(frappe.ValidationError):
-			billing.cancel_invoice(inv)
+			invoicing.cancel_invoice(inv)

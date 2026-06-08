@@ -5,7 +5,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import billing, subscriptions, tax
+from billing import invoicing, subscriptions, tax
 from billing.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
@@ -62,7 +62,7 @@ class TaxTestBase(IntegrationTestCase):
 		frappe.db.commit()
 
 	def _invoice(self):
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		return frappe.get_doc("Invoice", name)
 
 

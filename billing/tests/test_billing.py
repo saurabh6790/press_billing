@@ -7,7 +7,7 @@ import threading
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from billing import billing, credits, subscriptions
+from billing import invoicing, credits, subscriptions
 from billing.sync import receive_usage_events
 from billing.tests.utils import make_plan
 
@@ -88,7 +88,7 @@ class TestDraftGeneration(BillingTestBase):
 		push_event("e2", "R1", 2000, "2026-06-10 00:00:00", "changed")
 		push_event("e3", "R1", 1000, "2026-06-22 00:00:00", "changed")
 
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 
 		self.assertEqual(inv.status, "Draft")
@@ -106,7 +106,7 @@ class TestDraftGeneration(BillingTestBase):
 		push_event("e1", "R2", 1000, "2026-06-05 00:00:00", "subscribed")
 		push_event("e2", "R2", 1000, "2026-06-05 00:00:00", "cancelled")
 
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 		self.assertEqual(len(inv.items), 1)  # cancelled marker is skipped
 		self.assertEqual(inv.items[0].days, 1)
@@ -114,7 +114,7 @@ class TestDraftGeneration(BillingTestBase):
 
 	def test_partial_first_month_billed_for_join_window(self):
 		push_event("e1", "R3", 3000, "2026-06-15 00:00:00", "subscribed")
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		inv = frappe.get_doc("Invoice", name)
 		self.assertEqual(inv.items[0].days, 16)  # Jun15-30 inclusive
 		self.assertEqual(inv.items[0].amount, round(16 * 3000 / 30, 2))
@@ -125,27 +125,27 @@ class TestDraftGeneration(BillingTestBase):
 
 	def test_draft_generation_is_idempotent(self):
 		push_event("e1", "R1", 1000, "2026-06-01 00:00:00", "subscribed")
-		first = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
-		second = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		first = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		second = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		self.assertEqual(first, second)
 		self.assertEqual(frappe.db.count("Invoice", {"subscription": self.sub}), 1)
 
 	def test_no_runtime_yields_no_invoice(self):
-		name = billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		name = invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 		self.assertIsNone(name)
 
 
 class TestOpenAndCollect(BillingTestBase):
 	def _draft(self):
 		push_event("e1", "R1", 1000, "2026-06-01 00:00:00", "subscribed")
-		return billing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
+		return invoicing.generate_draft_invoice(self.sub, "2026-06-01", "2026-06-30")
 
 	def test_open_applies_credits_and_transitions(self):
 		name = self._draft()  # 30 days * 1000/30 = 1000
 		credits.purchase(TEAM, 400, "INR")
 		frappe.db.commit()
 
-		result = billing.open_and_collect(name)
+		result = invoicing.open_and_collect(name)
 		inv = frappe.get_doc("Invoice", name)
 		self.assertTrue(result["claimed"])
 		self.assertEqual(inv.status, "Open")
@@ -159,7 +159,7 @@ class TestOpenAndCollect(BillingTestBase):
 		credits.purchase(TEAM, 200, "INR")
 		frappe.db.commit()
 
-		results = run_workers(10, lambda i: billing.open_and_collect(name)["claimed"])
+		results = run_workers(10, lambda i: invoicing.open_and_collect(name)["claimed"])
 
 		claims = [r for r in results.values() if r is True]
 		self.assertEqual(len(claims), 1)  # exactly one worker claimed the invoice

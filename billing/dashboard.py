@@ -11,7 +11,7 @@ dashboard (#19) behind require_billing_admin.
 
 import frappe
 
-from billing import billing, credits, metering
+from billing import invoicing, credits, metering
 from billing.security import get_user_team, is_billing_admin, require_team_access
 from billing.tax import resolve_tax
 
@@ -81,7 +81,7 @@ def get_forecast(team: str | None = None) -> dict:
 
 	line_items = []
 	for cluster in _team_clusters(team):
-		line_items += billing.compute_line_items(team, cluster, month_start, month_end)
+		line_items += invoicing.compute_line_items(team, cluster, month_start, month_end)
 		line_items += metering.metered_line_items(team, cluster, month_start, month_end)
 
 	subtotal = frappe.utils.flt(sum(li["amount"] for li in line_items), 2)
