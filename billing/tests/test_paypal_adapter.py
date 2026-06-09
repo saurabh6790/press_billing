@@ -111,7 +111,31 @@ class TestPayPalAdapter(GatewayAdapterContract, IntegrationTestCase):
 		# A live vault token is the proof — no gateway round-trip.
 		yield
 
+	def expected_account_currency(self):
+		# PayPal's OAuth response carries no settlement currency.
+		return None
+
+	@contextmanager
+	def stub_credentials_valid(self):
+		with patch.object(PayPalAdapter, "_token", return_value="tok"):
+			yield
+
+	@contextmanager
+	def stub_credentials_invalid(self):
+		err = requests.exceptions.HTTPError("401 Unauthorized")
+		err.response = MagicMock(status_code=401)
+		with patch.object(PayPalAdapter, "_token", side_effect=err):
+			yield
+
 	# --- PayPal-specific -----------------------------------------------------
+
+	def test_register_webhook_returns_webhook_id_as_secret(self):
+		adapter = self.make_adapter()
+		with patch.object(PayPalAdapter, "_create_webhook", return_value={"id": "WH-NEW-1"}):
+			result = adapter.register_webhook("https://site/api/method/billing.payments.webhooks.paypal")
+		# PayPal verifies by webhook id, so it doubles as the stored "secret".
+		self.assertEqual(result["endpoint_id"], "WH-NEW-1")
+		self.assertEqual(result["secret"], "WH-NEW-1")
 
 	def test_registry_resolves_paypal(self):
 		adapter = get_adapter(make_paypal_gateway())

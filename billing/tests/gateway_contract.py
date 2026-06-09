@@ -70,7 +70,37 @@ class GatewayAdapterContract:
 	def stub_validation_success(self):
 		raise NotImplementedError
 
+	def stub_credentials_valid(self):
+		"""Context manager: the SDK accepts a validate_credentials read and
+		returns an account whose currency is `expected_account_currency()`."""
+		raise NotImplementedError
+
+	def stub_credentials_invalid(self):
+		"""Context manager: the SDK rejects the credentials (auth error)."""
+		raise NotImplementedError
+
+	def expected_account_currency(self):
+		"""Currency validate_credentials should report (or None if the gateway
+		does not expose one)."""
+		raise NotImplementedError
+
 	# --- contract -----------------------------------------------------------
+
+	def test_validate_credentials_returns_account_identity(self):
+		adapter = self.make_adapter()
+		with self.stub_credentials_valid():
+			identity = adapter.validate_credentials()
+		self.assertIsInstance(identity, dict)
+		self.assertTrue(identity.get("account_id"))
+		self.assertEqual(identity.get("currency"), self.expected_account_currency())
+
+	def test_validate_credentials_raises_on_bad_keys(self):
+		from billing.gateways.base import GatewayAuthError
+
+		adapter = self.make_adapter()
+		with self.stub_credentials_invalid():
+			with self.assertRaises(GatewayAuthError):
+				adapter.validate_credentials()
 
 	def test_setup_payment_method_returns_client_handles(self):
 		adapter = self.make_adapter()

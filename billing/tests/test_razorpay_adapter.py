@@ -129,7 +129,34 @@ class TestRazorpayAdapter(GatewayAdapterContract, IntegrationTestCase):
 		with self._client():
 			yield
 
+	def expected_account_currency(self):
+		return "INR"
+
+	@contextmanager
+	def stub_credentials_valid(self):
+		with self._client() as c:
+			c.payment.all.return_value = {"count": 0, "items": []}
+			yield
+
+	@contextmanager
+	def stub_credentials_invalid(self):
+		with self._client() as c:
+			c.payment.all.side_effect = razorpay.errors.BadRequestError("Authentication failed")
+			yield
+
 	# --- optional, gateway-specific capabilities ----------------------------
+
+	def test_register_webhook_generates_and_returns_secret(self):
+		adapter = self.make_adapter()
+		with self._client() as c:
+			c.webhook.create.return_value = {"id": "wh_123"}
+			result = adapter.register_webhook("https://site/api/method/billing.payments.webhooks.razorpay")
+		self.assertEqual(result["endpoint_id"], "wh_123")
+		# Razorpay takes a caller-chosen secret: we generate one and register it.
+		self.assertTrue(result["secret"])
+		sent = c.webhook.create.call_args.args[0]
+		self.assertEqual(sent["secret"], result["secret"])
+		self.assertEqual(sent["url"], "https://site/api/method/billing.payments.webhooks.razorpay")
 
 	def test_create_customer_returns_id(self):
 		adapter = self.make_adapter()

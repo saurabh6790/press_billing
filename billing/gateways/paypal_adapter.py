@@ -15,6 +15,7 @@ import requests
 
 from billing.gateways.base import (
 	GatewayAdapter,
+	GatewayAuthError,
 	GatewayTimeout,
 	NormalisedEvent,
 	PaymentResult,
@@ -25,6 +26,13 @@ from billing.gateways.base import (
 # Network/server failures are transient → GatewayTimeout (retry reuses the key).
 _TRANSIENT = (requests.exceptions.RequestException,)
 
+# The charge lifecycle events the webhook spine consumes (see webhooks.py).
+PAYPAL_WEBHOOK_EVENTS = [
+	"PAYMENT.CAPTURE.COMPLETED",
+	"PAYMENT.CAPTURE.DENIED",
+	"PAYMENT.CAPTURE.REFUNDED",
+]
+
 
 class PayPalAdapter(GatewayAdapter):
 	def _base(self) -> str:
@@ -33,6 +41,30 @@ class PayPalAdapter(GatewayAdapter):
 		)
 
 	# --- universal -----------------------------------------------------------
+
+	def validate_credentials(self) -> dict:
+		"""Cheapest authed read — fetch an OAuth token; bad client id/secret 401s.
+
+		PayPal does not expose a settlement currency on the OAuth response, so
+		`currency` is left None (no currency cross-check for PayPal)."""
+		try:
+			self._token()
+		except requests.exceptions.HTTPError as e:
+			status = getattr(e.response, "status_code", None)
+			if status in (400, 401):
+				raise GatewayAuthError(str(e)) from e
+			raise GatewayTimeout(str(e)) from e
+		except _TRANSIENT as e:
+			raise GatewayTimeout(str(e)) from e
+		return {"account_id": self.gateway.get_password("api_key"), "currency": None}
+
+	def register_webhook(self, callback_url: str, events: list[str] | None = None) -> dict:
+		"""Create a PayPal webhook. PayPal verifies callbacks by webhook *id* (not a
+		signing secret), so the id is what `webhook_secret` stores — return it as
+		both endpoint_id and secret."""
+		webhook = self._create_webhook(callback_url, events or PAYPAL_WEBHOOK_EVENTS)
+		webhook_id = webhook.get("id")
+		return {"endpoint_id": webhook_id, "secret": webhook_id}
 
 	def setup_payment_method(self, team, setup_data: dict) -> dict:
 		"""Begin vaulting a PayPal payment method (a Vault setup token the buyer
@@ -134,6 +166,19 @@ class PayPalAdapter(GatewayAdapter):
 		if request_id:
 			headers["PayPal-Request-Id"] = request_id
 		return headers
+
+	def _create_webhook(self, callback_url: str, events: list[str]) -> dict:
+		resp = requests.post(
+			f"{self._base()}/v1/notifications/webhooks",
+			json={
+				"url": callback_url,
+				"event_types": [{"name": name} for name in events],
+			},
+			headers=self._headers(),
+			timeout=30,
+		)
+		resp.raise_for_status()
+		return resp.json()
 
 	def _create_setup_token(self, team, setup_data: dict) -> dict:
 		resp = requests.post(

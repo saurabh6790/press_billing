@@ -137,7 +137,34 @@ class TestStripeAdapter(GatewayAdapterContract, IntegrationTestCase):
 		):
 			yield
 
+	def expected_account_currency(self):
+		return "USD"
+
+	@contextmanager
+	def stub_credentials_valid(self):
+		account = frappe._dict(id="acct_test", default_currency="usd")
+		with patch.object(stripe.Account, "retrieve", return_value=account):
+			yield
+
+	@contextmanager
+	def stub_credentials_invalid(self):
+		err = stripe.error.AuthenticationError("Invalid API Key provided")
+		with patch.object(stripe.Account, "retrieve", side_effect=err):
+			yield
+
 	# --- optional, gateway-specific capabilities ----------------------------
+
+	def test_register_webhook_returns_endpoint_and_secret(self):
+		adapter = self.make_adapter()
+		endpoint = frappe._dict(id="we_123", secret="whsec_live_xyz")
+		with patch.object(stripe.WebhookEndpoint, "create", return_value=endpoint) as m:
+			result = adapter.register_webhook("https://site/api/method/billing.payments.webhooks.stripe")
+		self.assertEqual(result["endpoint_id"], "we_123")
+		self.assertEqual(result["secret"], "whsec_live_xyz")
+		self.assertEqual(
+			m.call_args.kwargs["url"],
+			"https://site/api/method/billing.payments.webhooks.stripe",
+		)
 
 	def test_create_customer_returns_id(self):
 		adapter = self.make_adapter()
