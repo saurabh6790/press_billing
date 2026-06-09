@@ -53,26 +53,15 @@ class PaymentGateway(Document):
 		registered. A GatewayAuthError here aborts the save (bad keys never persist)."""
 		adapter = self.get_adapter()
 		try:
-			identity = adapter.validate_credentials()
+			adapter.validate_credentials()
 		except GatewayAuthError as e:
 			frappe.throw(
 				_("Gateway rejected these credentials: {0}").format(str(e)),
 				title=_("Invalid Gateway Keys"),
 			)
 
-		self._check_currency(identity)
 		self.credentials_validated_at = now_datetime()
 		self._ensure_webhook_registered(adapter)
-
-	def _check_currency(self, identity: dict):
-		account_currency = (identity or {}).get("currency")
-		if account_currency and self.currency and account_currency.upper() != self.currency.upper():
-			frappe.throw(
-				_("Gateway account currency {0} does not match the configured currency {1}.").format(
-					account_currency, self.currency
-				),
-				title=_("Currency Mismatch"),
-			)
 
 	def _ensure_webhook_registered(self, adapter):
 		"""Auto-fill webhook_secret by registering the endpoint at the gateway.
