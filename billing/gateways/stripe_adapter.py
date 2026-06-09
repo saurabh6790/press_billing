@@ -11,12 +11,21 @@ import stripe
 
 from billing.gateways.base import (
 	GatewayAdapter,
+	GatewayAuthError,
 	GatewayTimeout,
 	NormalisedEvent,
 	PaymentResult,
 	RefundResult,
 	header_value,
 )
+
+# The charge/refund lifecycle events the webhook spine consumes (see webhooks.py).
+STRIPE_WEBHOOK_EVENTS = [
+	"payment_intent.succeeded",
+	"payment_intent.payment_failed",
+	"payment_intent.amount_capturable_updated",
+	"charge.refunded",
+]
 
 
 def _to_dict(obj) -> dict:
@@ -44,6 +53,29 @@ class StripeAdapter(GatewayAdapter):
 		# https://docs.stripe.com/rate-limits#object-lock-timeouts
 		stripe.max_network_retries = 2
 		return stripe
+
+	def validate_credentials(self) -> dict:
+		"""Cheapest authed read — retrieve the account the secret key belongs to."""
+		self._configure()
+		try:
+			account = _to_dict(stripe.Account.retrieve())
+		except stripe.error.AuthenticationError as e:
+			raise GatewayAuthError(str(e)) from e
+		except (stripe.error.APIConnectionError, stripe.error.RateLimitError) as e:
+			raise GatewayTimeout(str(e)) from e
+		return {
+			"account_id": account.get("id"),
+			"currency": (account.get("default_currency") or "").upper() or None,
+		}
+
+	def register_webhook(self, callback_url: str, events: list[str] | None = None) -> dict:
+		"""Create a Stripe webhook endpoint; Stripe returns the `whsec_…` secret."""
+		self._configure()
+		endpoint = _to_dict(stripe.WebhookEndpoint.create(
+			url=callback_url,
+			enabled_events=events or STRIPE_WEBHOOK_EVENTS,
+		))
+		return {"endpoint_id": endpoint.get("id"), "secret": endpoint.get("secret")}
 
 	def setup_payment_method(self, team, setup_data: dict) -> dict:
 		"""Create an off-session SetupIntent; UI confirms it with the card."""

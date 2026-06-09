@@ -95,17 +95,20 @@ def _catalog():
 
 
 def _gateways():
+	# Demo keys are placeholders — skip live credential validation / webhook
+	# auto-registration so the seed runs offline.
+	seed = {"skip_credential_validation": True}
 	for currency, name in STRIPE.items():
 		_upsert("Payment Gateway", name, {
 			"title": f"Stripe ({currency})", "adapter_key": "stripe", "currency": currency,
 			"api_secret": "sk_test_demo", "webhook_secret": "whsec_demo",
 			"is_enabled": 1, "is_default_for_currency": 1,
-		}, newname=True)
+		}, newname=True, flags=seed)
 	_upsert("Payment Gateway", RAZORPAY, {
 		"title": "Razorpay (India)", "adapter_key": "razorpay", "currency": "INR",
 		"api_key": "rzp_test", "api_secret": "rzp_secret", "webhook_secret": "rzp_whsec",
 		"is_enabled": 1, "supports_mandates": 1,
-	}, newname=True)
+	}, newname=True, flags=seed)
 
 
 def _tier(team, level):
@@ -183,13 +186,16 @@ def _month_periods(n):
 	return out
 
 
-def _upsert(doctype, name, values, newname=False):
+def _upsert(doctype, name, values, newname=False, flags=None):
 	if frappe.db.exists(doctype, name):
 		frappe.delete_doc(doctype, name, force=True)
-	doc = {"doctype": doctype, **values}
+	data = {"doctype": doctype, **values}
 	if newname:
-		doc["__newname"] = name
-	return frappe.get_doc(doc).insert(ignore_permissions=True).name
+		data["__newname"] = name
+	doc = frappe.get_doc(data)
+	if flags:
+		doc.flags.update(flags)
+	return doc.insert(ignore_permissions=True).name
 
 
 def _ensure_signing_key():

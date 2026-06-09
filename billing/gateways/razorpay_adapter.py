@@ -8,11 +8,13 @@ ported from the working press implementation; the structure is the new adapter
 model. The UPI Autopay mandate *lifecycle* (cap = trust tier) is issue #08.
 """
 
+import frappe
 import razorpay
 import requests
 
 from billing.gateways.base import (
 	GatewayAdapter,
+	GatewayAuthError,
 	GatewayTimeout,
 	NormalisedEvent,
 	PaymentResult,
@@ -27,6 +29,14 @@ _TRANSIENT = (
 	requests.exceptions.RequestException,
 )
 
+# The charge lifecycle events the webhook spine consumes (see webhooks.py).
+RAZORPAY_WEBHOOK_EVENTS = [
+	"payment.captured",
+	"payment.failed",
+	"payment.authorized",
+	"refund.processed",
+]
+
 
 class RazorpayAdapter(GatewayAdapter):
 	# common_site_config.json overrides for live keys (see GatewayAdapter.get_credential).
@@ -40,6 +50,30 @@ class RazorpayAdapter(GatewayAdapter):
 		return razorpay.Client(
 			auth=(self.get_credential("api_key"), self.get_credential("api_secret"))
 		)
+
+	def validate_credentials(self) -> dict:
+		"""Cheapest authed read — list one payment to prove key/secret work.
+
+		Razorpay maps 401/4xx to BadRequestError → bad keys; transient/server
+		failures raise GatewayTimeout. Razorpay settles in INR."""
+		try:
+			self._client().payment.all({"count": 1})
+		except razorpay.errors.BadRequestError as e:
+			raise GatewayAuthError(str(e)) from e
+		except _TRANSIENT as e:
+			raise GatewayTimeout(str(e)) from e
+		return {"account_id": self.get_credential("api_key"), "currency": "INR"}
+
+	def register_webhook(self, callback_url: str, events: list[str] | None = None) -> dict:
+		"""Create a Razorpay webhook. Razorpay takes a caller-chosen secret, so we
+		generate a strong one server-side, register it, and return it to store."""
+		secret = frappe.generate_hash(length=32)
+		webhook = self._client().webhook.create({
+			"url": callback_url,
+			"secret": secret,
+			"events": events or RAZORPAY_WEBHOOK_EVENTS,
+		})
+		return {"endpoint_id": webhook.get("id"), "secret": secret}
 
 	def setup_payment_method(self, team, setup_data: dict) -> dict:
 		"""Create a recurring authorisation order — UPI Autopay or card.

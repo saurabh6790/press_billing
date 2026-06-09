@@ -56,6 +56,14 @@ class GatewayTimeout(GatewayError):
 	"""Network/timeout failure. Retry MUST reuse the same idempotency key."""
 
 
+class GatewayAuthError(GatewayError):
+	"""The gateway rejected the credentials (bad/expired API key/secret).
+
+	Distinct from GatewayTimeout (transient) — bad keys never become good on
+	retry, so setup is rejected rather than queued.
+	"""
+
+
 class GatewayUnsupported(GatewayError):
 	"""The gateway does not support this optional capability."""
 
@@ -81,6 +89,19 @@ class GatewayAdapter(ABC):
 			if value:
 				return value
 		return self.gateway.get_password(field)
+
+	# --- gateway setup (universal) ------------------------------------------
+
+	@abstractmethod
+	def validate_credentials(self) -> dict:
+		"""Prove the configured keys work via the cheapest authenticated read.
+
+		Returns the gateway account identity (at least `account_id`, and
+		`currency` where the gateway exposes it) so setup can confirm the keys
+		match the expected account. Raises GatewayAuthError on rejected
+		credentials; GatewayTimeout on a transient failure. Never moves money.
+		"""
+		...
 
 	# --- payment method lifecycle (universal) -------------------------------
 
@@ -117,6 +138,14 @@ class GatewayAdapter(ABC):
 
 	# --- optional, gateway-specific capabilities ----------------------------
 	# Default: unsupported. Implemented only where the gateway has the concept.
+
+	def register_webhook(self, callback_url: str, events: list[str] | None = None) -> dict:
+		"""Create the webhook endpoint at the gateway pointed at `callback_url`
+		and return `{"endpoint_id", "secret"}` so setup can auto-fill the signing
+		secret (no copy-paste from the gateway dashboard). `events` defaults to the
+		adapter's required set. Gateways that can't self-register leave this
+		unsupported and the admin enters the secret manually."""
+		raise GatewayUnsupported(f"{type(self).__name__} does not support register_webhook")
 
 	def create_order(self, amount, currency: str, receipt: str, notes: dict | None = None) -> dict:
 		"""Create a one-time checkout order/intent the client UI completes (top-up).
