@@ -18,4 +18,4 @@ const routes = [
   { path: '/billing/admin/trials', name: 'AdminTrials', component: () => import('@/pages/AdminTrials.vue') },
   { path: '/billing/admin/retention', name: 'AdminRetention', component: () => import('@/pages/AdminRetention.vue') },
 ];
-export default createRouter({ history: createWebHistory('/billing'), routes });
+export default createRouter({ history: createWebHistory('/'), routes });
