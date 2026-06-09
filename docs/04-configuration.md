@@ -5,20 +5,47 @@ DocType you configure in the Desk **Billing** workspace (or via the demo seed).
 
 ## 1. Roles & team scoping
 
-The app creates two roles on `after_migrate` (no manual step):
+> **Two models, by deployment.** Standalone, Billing uses two of its own Frappe
+> roles. Merged into **Central**, it uses Central's **capability-based IAM** — and
+> defines no roles of its own. The capability model is the target; see
+> [08 — Merging into Central](08-merge-into-central.md).
+
+### Target model — Central capabilities (authoritative)
+
+Central authorises per **team** via `central.iam.can(user, team, capability)`.
+Billing reuses two capabilities that already ship in Central's fixtures
+(`plane: central`, `resource: billing`):
+
+| Capability | Grants | Used by |
+|---|---|---|
+| `billing:view` | View billing data | All customer **read** endpoints |
+| `billing:manage` | Manage billing settings & payment operations | Pay invoice, buy credits, edit payment methods/settings |
+
+These come bundled in Central's system **Team Roles**:
+
+| Team Role | `billing:view` | `billing:manage` |
+|---|:--:|:--:|
+| **Owner** | ✅ | ✅ |
+| **Billing** | ✅ | ✅ |
+| Admin / Developer / Viewer | — | — |
+
+Cross-team / platform-staff access (the admin console) uses Central's **operator
+bypass** (`System Manager`). Billing defines **no** roles of its own in this mode.
+
+### Standalone model (current code, pre-merge)
+
+When run as a standalone app, the two roles below are created on `after_migrate`:
 
 | Role | Grants |
 |---|---|
-| `Billing Admin` | The admin console + all teams. `System Manager` and `Administrator` count as admin too. |
-| `Billing User` | The customer portal, scoped to **their own team only**. |
-
-A `Billing User` is tied to a team through the `User.billing_team` link field
-(also created on migrate). In production this derives from real team membership;
-here it is a User field so tests and the demo can set it.
+| `Billing Admin` | The admin console + all teams (also `System Manager` / `Administrator`). |
+| `Billing User` | The customer portal, scoped to **their own team only** (via the `User.billing_team` field). |
 
 > Guards live in `platform/security.py`: `require_billing_admin()` and
 > `require_team_access(team)`. Every endpoint funnels through one of them, so an
-> Agent API key (which holds neither role) gets a 403 on any billing endpoint.
+> Agent API key (which holds neither role) gets a 403. On merge these are
+> replaced one-for-one by `central.iam` calls — see the mapping table in
+> [08 — Merging into Central §3](08-merge-into-central.md).
 
 ## 2. Payment Gateways
 

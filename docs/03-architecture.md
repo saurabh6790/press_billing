@@ -146,12 +146,18 @@ flowchart LR
     WH -->|signature-first| Core[(Core)]
 ```
 
-- A **Billing User** only ever sees their own team
-  (`platform/security.py:require_team_access`).
-- A **Billing Admin** sees everything (`require_billing_admin`).
-- The **Agent API key** holds neither billing role, so it can never reach a
-  customer or admin endpoint — it gets a 403. It can only call the sync surface.
+- A **customer** only ever sees their own team. Standalone this is
+  `platform/security.py:require_team_access`; merged into Central it is
+  `central.iam.can(user, team, "billing:view")`.
+- A **platform admin** sees everything (`require_billing_admin`, or Central's
+  `System Manager` operator bypass once merged).
+- The **Agent API key** holds neither billing capability/role, so it can never
+  reach a customer or admin endpoint — it gets a 403. It can only call the sync
+  surface.
 - The **gateway** is verified by HMAC signature before any DB access.
+
+> On merge into Central the bespoke `Billing Admin`/`Billing User` roles are
+> dropped for Central's capability IAM. See [08 — Merging into Central](08-merge-into-central.md).
 
 See [04 — Configuration](04-configuration.md) for roles, and
 [05 — Workflows](05-workflows.md) for the lifecycles that ride these flows.

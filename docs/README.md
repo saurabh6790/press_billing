@@ -20,6 +20,7 @@ gateways, trust tiers, dunning, refunds, and the customer/admin dashboards.
 | Follow an end-to-end lifecycle (with diagrams) | [05 — Workflows](05-workflows.md) |
 | Look up an API endpoint or operator action | [06 — Actions & API reference](06-actions.md) |
 | Resolve a term ("price-lock", "floor", "minor unit") | [07 — Glossary](07-glossary.md) |
+| Fold Billing into the Central app + adopt its IAM | [08 — Merging into Central](08-merge-into-central.md) |
 
 ## The 60-second picture
 

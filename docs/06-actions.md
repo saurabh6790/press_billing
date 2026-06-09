@@ -3,7 +3,10 @@
 Every action a human or system can trigger, grouped by who calls it. All HTTP
 endpoints are Frappe whitelisted methods, callable at
 `/api/method/<dotted.path>`. Customer endpoints are auto-scoped to the caller's
-team; admin endpoints require the `Billing Admin` role.
+team; admin endpoints require the `Billing Admin` role (standalone) or
+`System Manager` operator bypass (merged into Central). Merged, customer reads
+require the `billing:view` capability and mutations require `billing:manage` —
+see [08 — Merging into Central](08-merge-into-central.md).
 
 ---
 
