@@ -2,6 +2,12 @@
 
 Billing & payments system of record for Frappe Cloud v2
 
+### Documentation
+
+New here? Start with **[docs/](docs/README.md)** — a guided set covering the
+overview, onboarding, architecture, configuration, end-to-end workflows (with
+diagrams), the action/API reference, and a glossary.
+
 ### Installation
 
 You can install this app using the [bench](https://github.com/frappe/bench) CLI:
