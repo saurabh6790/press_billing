@@ -149,6 +149,34 @@ stateDiagram-v2
     Paid --> [*]
 ```
 
+### Buying credits, and a wallet that always adds up
+
+You can pay as you go, or you can put money on account ahead of time as credits.
+The thing we care about most here is trust: the balance in your wallet has to be
+something you can rely on, down to the last paisa. So instead of keeping a single
+number we keep nudging up and down, we keep a ledger — a permanent, ordered list
+where every credit you buy and every bit you spend is its own entry that's never
+edited or erased. Your balance is simply that list added up. Because nothing is
+ever overwritten, the running total can't quietly drift, and you can always trace
+exactly where every credit came from and where it went.
+
+```mermaid
+flowchart TB
+    Buy[You buy credits] -->|+ entry| Ledger[(Credit ledger<br/>permanent, append-only)]
+    Adj[Admin adjustment] -->|+ / − entry| Ledger
+    Refund[Overcharge refund] -->|+ entry| Ledger
+    Spend[A bill is settled] -->|− entry| Ledger
+    Ledger -->|all entries added up| Wallet[Your wallet balance]
+```
+
+Buying credits is the same simple two-step you'd expect — we set up the purchase
+with the payment provider, and the moment it's confirmed, a credit entry lands in
+your ledger and your balance goes up. Spending them is just the other direction:
+when a bill is settled from your wallet, that's a matching entry going out. Two
+people (or two jobs) can never accidentally spend the same credit twice — the
+wallet is locked for the instant a spend is recorded, so the books always
+balance.
+
 ### Paying — credits first, then your card
 
 When a bill opens, any credits in your wallet are used first, and only the
